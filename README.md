@@ -58,34 +58,6 @@ This project is structured around three progressive levels of maturity:
 
 <img width="1024" height="1536" alt="READ-ME-IMAGE" src="https://github.com/user-attachments/assets/d69e532b-d7a4-452f-8bf6-bc2f43b5b146" />
 
-    +----------------------+
-    |   Source Data        |
-    | (Logs / Audit Data)  |
-    +----------+-----------+
-               |
-               v
-    +----------------------+
-    | Data Frame Analytics |
-    |   (Model Training)   |
-    +----------+-----------+
-               |
-               v
-    +----------------------+
-    | Inference Pipeline   |
-    | (Real-time Scoring)  |
-    +----------+-----------+
-               |
-               v
-    +----------------------+
-    |   AI Agent Builder   |
-    | (Analysis + Insight) |
-    +----------+-----------+
-               |
-               v
-    +----------------------+
-    |   Workflows Engine   |
-    | (Automation Layer)   |
-    +----------------------+
 
 ## 🧩 Closing Thoughts
 
