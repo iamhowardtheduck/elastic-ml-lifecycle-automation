@@ -1,0 +1,418 @@
+# classification-workshop.yml
+# SDG configuration for the focused ML Classification Workshop.
+# Generates ONLY the three data streams needed for:
+#   1. mortgage-privileged-access-classification (PingOne + Oracle)
+#   2. mortgage-audit-classification (LendPath audit)
+#
+# Anomaly percentage and volumes are controlled at runtime by sdg-prime-classification.py.
+# This YAML defines field schemas and value pools; the generator overrides
+# audit.is_suspicious and ping_one.audit.risk.level based on --anomaly-pct.
+
+# ─── Elasticsearch connection ──────────────────────────────────────────────────
+elasticsearchScheme: https
+elasticsearchHost: localhost
+elasticsearchPort: 9200
+elasticsearchUser: elastic
+elasticsearchPassword: changeme
+verifyCerts: false
+
+# ─── Workloads ────────────────────────────────────────────────────────────────
+workloads:
+
+  # ===========================================================================
+  # 1. LENDPATH AUDIT  →  logs-mortgage.audit-default
+  #    Classification job: mortgage-audit-classification
+  #    Dependent variable: audit.is_suspicious
+  #    Features: audit.risk_score, audit.mfa_used, audit.off_hours,
+  #              audit.new_device, audit.vpn_detected, event.action,
+  #              user.roles, source.geo.country_iso_code
+  # ===========================================================================
+  - indexName: logs-mortgage.audit-default
+    dataStream: true
+    purgeOnStart: false
+    workloadThreads: 2
+    workloadSleep: 100
+
+    fields:
+      - name: "@timestamp"
+        type: timestamp
+        range: "0,1"
+
+      - name: ecs.version
+        value: "8.11.0"
+
+      - name: data_stream.type
+        value: logs
+      - name: data_stream.dataset
+        value: mortgage.audit
+      - name: data_stream.namespace
+        value: default
+
+      - name: event.kind
+        value: event
+      - name: event.category
+        type: random_string_from_list
+        custom_list: "authentication,authentication,authentication,authorization,iam,file,database,network"
+      - name: event.type
+        type: random_string_from_list
+        custom_list: "start,end,change,access,creation,deletion,info"
+      - name: event.action
+        type: random_string_from_list
+        custom_list: >
+          user_login,
+          user_login,
+          user_login,
+          user_logout,
+          user_login_failed,
+          mfa_challenge,
+          mfa_success,
+          mfa_failed,
+          password_reset,
+          account_locked,
+          permission_granted,
+          permission_denied,
+          document_accessed,
+          document_downloaded,
+          document_deleted,
+          ssn_accessed,
+          credit_report_accessed,
+          rate_overridden,
+          fee_waived,
+          admin_impersonation,
+          bulk_export,
+          api_key_created,
+          api_key_revoked,
+          config_changed,
+          loan_amount_modified
+      - name: event.outcome
+        type: random_string_from_list
+        custom_list: "success,success,success,success,failure,failure,unknown"
+      - name: event.dataset
+        value: mortgage.audit
+
+      # ── actor ──────────────────────────────────────────────────────────────
+      - name: user.id
+        type: random_string_from_list
+        custom_list: "LO-001,LO-002,LO-003,LO-004,LO-005,LO-006,LO-007,LO-008,LO-009,LO-010,PROC-01,PROC-02,UW-01,UW-02,UW-03,ADMIN-01,SYS-BOT"
+      - name: user.name
+        type: full_name
+      - name: user.email
+        type: email
+      - name: user.roles
+        type: random_string_from_list
+        custom_list: "loan_officer,loan_officer,loan_officer,processor,underwriter,admin,system,compliance"
+
+      # ── source location ────────────────────────────────────────────────────
+      - name: source.ip
+        type: ip
+        cidr: "10.0.0.0/8"
+      - name: source.geo.country_iso_code
+        type: random_string_from_list
+        custom_list: "US,US,US,US,US,US,US,US,CA,GB,DE,AU,FR,IN,CN,RU,NG,BR,MX,JP"
+      - name: source.geo.city_name
+        type: city
+      - name: source.geo.region_name
+        type: state
+
+      # ── audit ML features ──────────────────────────────────────────────────
+      # NOTE: audit.is_suspicious is overridden at runtime by sdg-prime-classification.py
+      # based on --anomaly-pct. The value here is a fallback default only.
+      - name: audit.risk_score
+        type: float
+        range: "0,100"
+      - name: audit.is_suspicious
+        type: random_string_from_list
+        custom_list: "false,false,false,false,false,false,false,false,false,true"
+      - name: audit.session_id
+        type: uuid
+      - name: audit.mfa_used
+        type: boolean
+      - name: audit.off_hours
+        type: boolean
+      - name: audit.new_device
+        type: boolean
+      - name: audit.vpn_detected
+        type: boolean
+
+      - name: host.hostname
+        type: random_string_from_list
+        custom_list: "audit-svc-01,audit-svc-02"
+      - name: host.name
+        type: random_string_from_list
+        custom_list: "audit-svc-01,audit-svc-02"
+
+      - name: message
+        type: random_string_from_list
+        custom_list: >
+          "Successful user authentication",
+          "Failed authentication attempt",
+          "MFA challenge issued",
+          "MFA verification successful",
+          "MFA verification failed",
+          "Account locked due to excessive failed attempts",
+          "Sensitive document accessed",
+          "SSN field accessed in loan application",
+          "Credit report retrieved from bureau",
+          "Rate override applied by loan officer",
+          "Fee waiver applied",
+          "Bulk data export initiated",
+          "API key generated",
+          "Administrative impersonation session started",
+          "Loan amount modified post-submission",
+          "Configuration parameter changed",
+          "Compliance audit log queried"
+
+      - name: tags
+        value: mortgage-audit
+
+
+  # ===========================================================================
+  # 2. PINGONE IAM AUDIT  →  logs-ping_one.audit-mortgage
+  #    Classification job: mortgage-privileged-access-classification
+  #    Dependent variable: ping_one.audit.risk.level
+  #    Features: ping_one.audit.risk.score, ping_one.audit.action.type,
+  #              ping_one.audit.result.status, event.outcome
+  # ===========================================================================
+  - indexName: logs-ping_one.audit-mortgage
+    dataStream: true
+    purgeOnStart: false
+    workloadThreads: 2
+    workloadSleep: 150
+
+    fields:
+      - name: "@timestamp"
+        type: timestamp
+        range: "0,1"
+
+      - name: ecs.version
+        value: "8.11.0"
+
+      - name: data_stream.type
+        value: logs
+      - name: data_stream.dataset
+        value: ping_one.audit
+      - name: data_stream.namespace
+        value: mortgage
+
+      - name: event.kind
+        value: event
+      - name: event.category
+        type: random_string_from_list
+        custom_list: "iam,iam,iam,authentication,configuration"
+      - name: event.dataset
+        value: ping_one.audit
+      - name: event.action
+        type: random_string_from_list
+        custom_list: >
+          USER.ACCESS_ALLOWED,
+          USER.ACCESS_ALLOWED,
+          USER.ACCESS_ALLOWED,
+          USER.ACCESS_DENIED,
+          USER.AUTHENTICATION.SUCCESS,
+          USER.AUTHENTICATION.SUCCESS,
+          USER.AUTHENTICATION.FAILED,
+          USER.MFA.SUCCESS,
+          USER.MFA.FAILED,
+          USER.MFA.BYPASS,
+          USER.PASSWORD.RESET,
+          USER.ACCOUNT.LOCKED,
+          USER.ACCOUNT.UNLOCKED,
+          USER.ROLE.GRANTED,
+          USER.ROLE.REVOKED,
+          APPLICATION.ACCESS.GRANTED,
+          APPLICATION.ACCESS.REVOKED,
+          FLOW.EXECUTION.SUCCESS,
+          ADMIN.USER.CREATED,
+          ADMIN.USER.DELETED,
+          ADMIN.APPLICATION.CREATED,
+          ADMIN.POLICY.UPDATED,
+          ADMIN.SAML.ASSERTION.CREATED
+      - name: event.outcome
+        type: random_string_from_list
+        custom_list: "success,success,success,failure"
+      - name: event.type
+        type: random_string_from_list
+        custom_list: "user,info,access"
+
+      - name: input.type
+        value: http_endpoint
+
+      - name: user.id
+        type: random_string_from_list
+        custom_list: >
+          lo-001-uuid,lo-002-uuid,lo-003-uuid,lo-004-uuid,lo-005-uuid,
+          lo-006-uuid,lo-007-uuid,lo-008-uuid,lo-009-uuid,lo-010-uuid,
+          proc-01-uuid,proc-02-uuid,
+          uw-01-uuid,uw-02-uuid,uw-03-uuid,
+          admin-01-uuid,sysadmin-uuid
+      - name: user.email
+        type: email
+      - name: user.name
+        type: full_name
+      - name: client.user.id
+        type: uuid
+      - name: client.user.name
+        type: full_name
+
+      - name: source.ip
+        type: ip
+        cidr: "10.0.0.0/8"
+      - name: source.geo.country_iso_code
+        type: random_string_from_list
+        custom_list: "US,US,US,US,US,US,US,CA,GB,DE,AU,NG,RU,CN,BR"
+      - name: source.geo.city_name
+        type: city
+      - name: source.geo.region_name
+        type: state
+
+      - name: ping_one.audit.action.type
+        type: random_string_from_list
+        custom_list: "AUTHENTICATION,AUTHENTICATION,AUTHORIZATION,ACCOUNT,MFA,ADMIN,SAML,FLOW"
+      - name: ping_one.audit.actors.client.type
+        value: WORKER
+      - name: ping_one.audit.actors.user.type
+        value: USER
+      - name: ping_one.audit.result.status
+        type: random_string_from_list
+        custom_list: "SUCCESS,SUCCESS,SUCCESS,FAILED,BLOCKED,REQUIRES_MFA"
+      - name: ping_one.audit.result.description
+        type: random_string_from_list
+        custom_list: >
+          "Authentication successful",
+          "Access granted",
+          "Authentication failed: invalid credentials",
+          "Authentication failed: account locked",
+          "MFA bypass detected",
+          "Access denied: insufficient privileges",
+          "Risk threshold exceeded"
+
+      # NOTE: ping_one.audit.risk.level is overridden at runtime by sdg-prime-classification.py
+      # based on --anomaly-pct. HIGH = anomaly class.
+      - name: ping_one.audit.risk.score
+        type: float
+        range: "0,100"
+      - name: ping_one.audit.risk.level
+        type: random_string_from_list
+        custom_list: "LOW,LOW,LOW,LOW,MEDIUM,MEDIUM,HIGH"
+
+      - name: tags
+        value: ping_one-audit
+
+
+  # ===========================================================================
+  # 3. ORACLE DATABASE AUDIT  →  logs-oracle.database_audit-mortgage
+  #    Classification job: mortgage-privileged-access-classification
+  #    Features: oracle.database_audit.action, oracle.database_audit.privilege,
+  #              event.outcome
+  # ===========================================================================
+  - indexName: logs-oracle.database_audit-mortgage
+    dataStream: true
+    purgeOnStart: false
+    workloadThreads: 2
+    workloadSleep: 200
+
+    fields:
+      - name: "@timestamp"
+        type: timestamp
+        range: "0,1"
+
+      - name: ecs.version
+        value: "8.11.0"
+
+      - name: data_stream.type
+        value: logs
+      - name: data_stream.dataset
+        value: oracle.database_audit
+      - name: data_stream.namespace
+        value: mortgage
+
+      - name: event.kind
+        value: event
+      - name: event.category
+        value: database
+      - name: event.action
+        value: database_audit
+      - name: event.dataset
+        value: oracle.database_audit
+      - name: event.outcome
+        type: random_string_from_list
+        custom_list: "success,success,success,success,failure"
+      - name: event.type
+        value: access
+
+      - name: client.user.name
+        type: random_string_from_list
+        custom_list: "oracle,lendpath_app,lendpath_ro,lendpath_batch,dba_admin,sys,system,auditor"
+
+      - name: user.roles
+        type: random_string_from_list
+        custom_list: "CONNECT,CONNECT,CONNECT,RESOURCE,DBA,SYSDBA,SYSOPER,SELECT_CATALOG_ROLE"
+
+      - name: server.address
+        type: random_string_from_list
+        custom_list: "db-primary-01.lendpath.internal,db-replica-01.lendpath.internal"
+      - name: server.domain
+        type: random_string_from_list
+        custom_list: "db-primary-01.lendpath.internal,db-replica-01.lendpath.internal"
+
+      - name: process.pid
+        type: int
+        range: "1,65535"
+
+      - name: oracle.database_audit.action
+        type: random_string_from_list
+        custom_list: >
+          LOGON,LOGON,LOGON,LOGOFF,
+          SELECT,SELECT,SELECT,SELECT,
+          INSERT,UPDATE,DELETE,
+          CREATE TABLE,DROP TABLE,ALTER TABLE,
+          CREATE USER,DROP USER,ALTER USER,
+          GRANT,REVOKE,
+          EXECUTE,
+          CREATE OR REPLACE PROCEDURE,
+          AUDIT,NOAUDIT,
+          EXPORT,IMPORT
+      - name: oracle.database_audit.action_number
+        type: int
+        range: "1,300"
+      - name: oracle.database_audit.database.user
+        type: random_string_from_list
+        custom_list: "lendpath_app,lendpath_ro,lendpath_batch,dba_admin,sys,system"
+      - name: oracle.database_audit.entry.id
+        type: long
+        range: "1,9999999"
+      - name: oracle.database_audit.length
+        type: int
+        range: "100,4096"
+      - name: oracle.database_audit.obj.name
+        type: random_string_from_list
+        custom_list: >
+          LOAN_APPLICATIONS,BORROWER_PII,CREDIT_SCORES,
+          LOAN_OFFICERS,APPRAISALS,CLOSING_DOCUMENTS,
+          SYSTEM_CONFIG,AUDIT_LOG,USERS,ROLES,
+          INTEREST_RATES,FEE_SCHEDULES
+      - name: oracle.database_audit.obj.schema
+        type: random_string_from_list
+        custom_list: "LENDPATH,SYS,SYSTEM,DBA_ADMIN"
+      - name: oracle.database_audit.privilege
+        type: random_string_from_list
+        custom_list: "NOT APPLICABLE,SELECT ANY TABLE,CREATE SESSION,SYSDBA,DBA,CREATE ANY PROCEDURE"
+      - name: oracle.database_audit.result_code
+        type: int
+        range: "0,1500"
+      - name: oracle.database_audit.session_id
+        type: long
+        range: "1,9999999"
+      - name: oracle.database_audit.status
+        type: random_string_from_list
+        custom_list: "Success,Success,Success,Failure"
+      - name: oracle.database_audit.terminal
+        type: random_string_from_list
+        custom_list: "pts/0,pts/1,pts/2,console,UNKNOWN"
+
+      - name: related.hosts
+        type: random_string_from_list
+        custom_list: "db-primary-01.lendpath.internal,db-replica-01.lendpath.internal"
+
+      - name: tags
+        value: oracle-database-audit
