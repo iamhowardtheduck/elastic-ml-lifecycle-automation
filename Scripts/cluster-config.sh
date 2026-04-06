@@ -31,3 +31,6 @@ bash /opt/workshops/elastic-llm.sh -k false -m claude-sonnet-4 -d true
 echo
 echo "AWS Bedrock AI Assistant Connector configured as OpenAI"
 echo
+echo 
+echo
+echo "You are now ready to move onto the next step."
