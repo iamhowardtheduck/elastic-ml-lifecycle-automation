@@ -17,6 +17,21 @@ Key controls
   --events-per-day Max events per day (weekdays)      (default: 2000)
   --anomaly-pct    % of events that are anomalies     (default: 15)
   --timezone       Local timezone for diurnal pattern (auto-detected)
+  --backfill-only  Stop after backfill, do not start live generation
+  --live-only      Skip backfill entirely, start live generation immediately
+
+Live generation
+───────────────
+After the historical backfill completes, the generator automatically transitions
+to live mode:
+
+  • Calculates how many events were already written for today during backfill
+  • Generates only the remaining events for today at the correct real-time rate
+  • After midnight rolls into full days, respecting the calendar and diurnal pattern
+  • Live mode runs until Ctrl+C
+
+Example: --events-per-day 100000, today is a weekday, backfill wrote 25,750 events
+for today → live mode generates 74,250 more events spread across the remaining hours.
 
 Anomaly embedding
 ─────────────────
@@ -81,9 +96,21 @@ except ImportError:
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
+import multiprocessing as _mp
+
 DEFAULT_DAYS        = 30
 DEFAULT_EPD         = 2000     # events per weekday
 DEFAULT_ANOMALY_PCT = 15       # percent of events that are anomalous
+
+# Auto-detect CPU cores and derive sensible I/O-bound defaults.
+# Bulk indexing is network/I/O bound so 2× cores for workers is efficient.
+# pb_threads is per-worker thread count inside parallel_bulk — keep low
+# to avoid overwhelming the ES node with too many concurrent connections.
+_CPU_CORES    = _mp.cpu_count() or 4
+DEFAULT_WORKERS    = min(_CPU_CORES * 2, 32)   # cap at 32
+DEFAULT_PB_THREADS = min(4, max(2, _CPU_CORES // 4))
+DEFAULT_BULK_SIZE  = 500
+DEFAULT_PB_QUEUE   = 4
 
 # Diurnal weights — business-hours peak (10:00–14:00)
 _WORKDAY_W = [
@@ -187,6 +214,55 @@ def timestamps_for_day(day_dt, count, tz):
         for _ in range(n):
             ts = h_utc + timedelta(seconds=random.uniform(0, 3599))
             yield ts.strftime("%Y-%m-%dT%H:%M:%S.") + f"{ts.microsecond//1000:03d}Z"
+
+
+def timestamps_from_now(count, end_of_day_utc, tz):
+    """Yield (ts_string, sleep_seconds) for live generation.
+
+    Distributes `count` events between now and end_of_day_utc using the
+    diurnal weights for today, but only considering hours from now onwards.
+    Yields each timestamp with the real-time sleep interval before it should
+    be indexed so the event stream feels live.
+    """
+    now_utc = datetime.now(timezone.utc)
+    today_local = now_utc.astimezone(tz).date()
+    weights = _hour_weights(today_local)
+
+    # Only consider hours from current hour through end of day
+    current_hour = now_utc.astimezone(tz).hour
+    remaining_weights = list(weights)
+    for h in range(current_hour):
+        remaining_weights[h] = 0
+
+    total_w = sum(remaining_weights)
+    if total_w == 0 or count <= 0:
+        return
+
+    counts = _hour_counts(count, remaining_weights)
+
+    # Build a sorted list of (utc_datetime, ) for each event
+    events = []
+    day_start = datetime(today_local.year, today_local.month, today_local.day, tzinfo=tz)
+    for hour, n in enumerate(counts):
+        if n <= 0:
+            continue
+        h_local = day_start + timedelta(hours=hour)
+        h_utc   = h_local.astimezone(timezone.utc)
+        for _ in range(n):
+            ts = h_utc + timedelta(seconds=random.uniform(0, 3599))
+            # Only generate timestamps in the future (or very recent past)
+            if ts < now_utc:
+                ts = now_utc + timedelta(seconds=random.uniform(1, 30))
+            events.append(ts)
+
+    events.sort()
+
+    prev = now_utc
+    for ts in events:
+        sleep_s = max(0.0, (ts - prev).total_seconds())
+        ts_str  = ts.strftime("%Y-%m-%dT%H:%M:%S.") + f"{ts.microsecond//1000:03d}Z"
+        yield ts_str, sleep_s
+        prev = ts
 
 
 # ── Value pools ────────────────────────────────────────────────────────────────
@@ -297,7 +373,6 @@ def make_audit_doc(ts, anomaly_pct):
     return {
         "@timestamp": ts,
         "ecs":        {"version": "8.11.0"},
-        "data_stream":{"type":"logs","dataset":"mortgage.audit","namespace":"default"},
         "event": {
             "kind":     "event",
             "category": random.choice(["authentication","authorization","iam","file"]),
@@ -360,7 +435,6 @@ def make_pingone_doc(ts, anomaly_pct):
     return {
         "@timestamp": ts,
         "ecs":        {"version": "8.11.0"},
-        "data_stream":{"type":"logs","dataset":"ping_one.audit","namespace":"mortgage"},
         "event": {
             "kind":     "event",
             "category": random.choice(["iam","authentication","configuration"]),
@@ -435,8 +509,6 @@ def make_oracle_doc(ts, anomaly_pct):
     return {
         "@timestamp": ts,
         "ecs":        {"version": "8.11.0"},
-        "data_stream":{"type":"logs","dataset":"oracle.database_audit",
-                       "namespace":"mortgage"},
         "event": {
             "kind":     "event",
             "category": "database",
@@ -500,6 +572,152 @@ def day_worker(es, index, builder, day_dt, count, anomaly_pct,
         progress_q.put(f"ERR:{index}:{day_dt}:{e}")
 
 
+# ── Live generation ───────────────────────────────────────────────────────────
+
+def live_generate(es, epd, anomaly_pct, backfill_days, backfill_today_count,
+                  bulk_size, pb_threads, pb_queue, tz):
+    """Continuous live event generation after backfill completes.
+
+    Args:
+        epd:                   Max events per day target (weekdays)
+        backfill_days:         Number of days covered by the backfill
+        backfill_today_count:  Events already written for today during backfill
+        tz:                    Local timezone
+    """
+    tz_name = tz_str(tz)
+    print(f"\n{'='*70}")
+    print(f"  Backfill data completed {backfill_days} days.")
+    print(f"  Data going forward is being generated at {epd:,} events per day.")
+    print(f"  Timezone: {tz_name} | Press Ctrl+C to stop.\n")
+
+    indexed_live  = 0
+    error_count   = 0
+    start_time    = time.time()
+    _last_status  = time.time()
+    current_day   = datetime.now(tz).date()
+
+    # Calculate remaining quota for today
+    today_target  = max(0, round(epd * _day_factor(current_day)) - backfill_today_count)
+    end_of_today  = (datetime(current_day.year, current_day.month, current_day.day,
+                               tzinfo=tz) + timedelta(days=1)).astimezone(timezone.utc)
+
+    print(f"  Today ({current_day}):")
+    print(f"    Backfill wrote:    {backfill_today_count:>8,} events per stream")
+    print(f"    Remaining today:   {today_target:>8,} events per stream")
+    print(f"    Day rolls at:      {end_of_today.strftime('%H:%M:%S UTC')}\n")
+
+    def _index_doc(index, builder, ts):
+        """Index a single live document — returns True on success."""
+        doc = builder(ts, anomaly_pct)
+        try:
+            for ok, info in parallel_bulk(
+                es,
+                [{"_op_type": "create", "_index": index, "_source": doc}],
+                thread_count=1, chunk_size=1,
+                queue_size=1, raise_on_error=False,
+                raise_on_exception=False, request_timeout=30,
+            ):
+                return ok
+        except Exception:
+            return False
+        return False
+
+    # ── Today's remaining events ──────────────────────────────────────────────
+    if today_target > 0:
+        # Generate sorted event timestamps for the rest of today for all 3 streams
+        # and interleave them by time
+        stream_events = {}
+        for index, (builder, _) in _BUILDERS.items():
+            gen = list(timestamps_from_now(today_target, end_of_today, tz))
+            stream_events[index] = (builder, iter(gen))
+
+        # Drain all three stream iterators, sleeping between events
+        active = {k: v for k, v in stream_events.items()}
+        # Prefetch first event from each stream
+        nexts = {}
+        for idx, (builder, it) in active.items():
+            try:
+                ts, sleep_s = next(it)
+                nexts[idx] = (builder, it, ts, sleep_s)
+            except StopIteration:
+                pass
+
+        while nexts:
+            # Find the stream with the earliest next event
+            earliest = min(nexts.items(), key=lambda x: x[1][2])
+            idx, (builder, it, ts, sleep_s) = earliest
+            if sleep_s > 0:
+                time.sleep(min(sleep_s, 5.0))  # cap sleep to stay responsive
+            ok = _index_doc(idx, builder, ts)
+            if ok:
+                indexed_live += 1
+            else:
+                error_count += 1
+            # Advance this stream
+            try:
+                ts_next, sleep_next = next(it)
+                nexts[idx] = (builder, it, ts_next, sleep_next)
+            except StopIteration:
+                del nexts[idx]
+            # Progress every 500 docs
+            if time.time() - _last_status >= 30:
+                print(f"  Backfill data completed {backfill_days} days. "
+                      f"Data going forward is being generated at {epd:,} events per day. "
+                      f"[{indexed_live:,} live docs indexed"
+                      + (f", {error_count} errors" if error_count else "") + "]")
+                _last_status = time.time()
+
+    # ── Full days after midnight ──────────────────────────────────────────────
+    print(f"\n  Today's remaining events complete — entering continuous mode.")
+    print(f"  Will generate full days as they roll. Press Ctrl+C to stop.\n")
+
+    while True:
+        now_local  = datetime.now(tz)
+        today      = now_local.date()
+        day_target = max(1, round(epd * _day_factor(today)))
+        midnight   = (datetime(today.year, today.month, today.day, tzinfo=tz)
+                      + timedelta(days=1))
+        seconds_in_day   = 86400
+        seconds_remaining = max(1, (midnight.astimezone(timezone.utc)
+                                     - datetime.now(timezone.utc)).total_seconds())
+        # Rate: spread day_target events across remaining seconds
+        sleep_per_event = seconds_remaining / (day_target * len(_BUILDERS))
+
+        day_indexed = 0
+        try:
+            while datetime.now(tz).date() == today:
+                for index, (builder, _) in _BUILDERS.items():
+                    ts = datetime.now(timezone.utc)
+                    ts_str = ts.strftime("%Y-%m-%dT%H:%M:%S.") + f"{ts.microsecond//1000:03d}Z"
+                    ok = _index_doc(index, builder, ts_str)
+                    if ok:
+                        indexed_live += 1
+                        day_indexed  += 1
+                    else:
+                        error_count += 1
+                time.sleep(max(0.001, sleep_per_event))
+                if time.time() - _last_status >= 30:
+                    print(f"  Backfill data completed {backfill_days} days. "
+                          f"Data going forward is being generated at {epd:,} events per day. "
+                          f"[{indexed_live:,} live docs indexed"
+                          + (f", {error_count} errors" if error_count else "") + "]")
+                    _last_status = time.time()
+        except KeyboardInterrupt:
+            break
+
+    elapsed = time.time() - start_time
+    h = int(elapsed // 3600)
+    m = int((elapsed % 3600) // 60)
+    s = int(elapsed % 60)
+    elapsed_str = f"{h:02d}h {m:02d}m {s:02d}s" if h else f"{m:02d}m {s:02d}s"
+    print(f"\n{'='*70}")
+    print(f"  Live generation stopped.")
+    print(f"  Backfill: {backfill_days} days  |  Live docs indexed: {indexed_live:,}"
+          + (f"  |  {error_count} errors" if error_count else ""))
+    print(f"  Live elapsed: {elapsed_str}")
+    print(f"{'='*70}\n")
+
+
 # ── Main backfill ──────────────────────────────────────────────────────────────
 
 def backfill(host, user, password, verify_ssl,
@@ -538,6 +756,7 @@ def backfill(host, user, password, verify_ssl,
     print(f"  Timezone:       {tz_name}")
     print(f"  Window:         {start_day}  →  {today}")
     print(f"  ~Total docs:    {total_docs:,}")
+    print(f"  CPU cores:      {_CPU_CORES}  →  workers={workers}, pb_threads={pb_threads}")
     print()
 
     if "utc" in tz_name.lower() or tz_name in ("UTC","Etc/UTC","GMT"):
@@ -581,8 +800,10 @@ def backfill(host, user, password, verify_ssl,
                     break
                 if isinstance(item, str) and item.startswith("ERR:"):
                     error_count += 1
-                    if error_count <= 20:
-                        print(f"\n  ⚠ {item[4:]}")
+                    if error_count <= 50:
+                        print(f"\n  ✗ {item[4:]}")
+                    elif error_count == 51:
+                        print("\n  (further errors suppressed)")
                 else:
                     indexed_total += 1
                 now = time.time()
@@ -601,6 +822,15 @@ def backfill(host, user, password, verify_ssl,
 
     t_print = threading.Thread(target=printer, daemon=True)
     t_print.start()
+
+    # Pre-flight: verify all three data streams exist
+    print("  Checking data streams…")
+    for index in _BUILDERS:
+        try:
+            info = es.indices.get_data_stream(name=index)
+            print(f"    ✓ {index}")
+        except Exception:
+            print(f"    ✗ {index} — NOT FOUND. Run bootstrap-classification.py first.")
 
     # Work queue: one item per (stream, day)
     work_q = Queue()
@@ -653,11 +883,29 @@ def backfill(host, user, password, verify_ssl,
           f"(~{round(sum(c for _,c in schedule)*anomaly_pct/100):,} docs)")
     print(f"    Oracle high-privilege actions:    ~{anomaly_pct}%  "
           f"(~{round(sum(c for _,c in schedule)*anomaly_pct/100):,} docs)")
+    h = int(elapsed // 3600)
+    m = int((elapsed % 3600) // 60)
+    s = int(elapsed % 60)
+    elapsed_str = f"{h:02d}h {m:02d}m {s:02d}s" if h else f"{m:02d}m {s:02d}s"
+    print(f"\n{'='*70}")
+    print(f"  Backfill complete — {days} days indexed in {elapsed_str}")
+    print(f"  {'─'*66}")
+    print(f"  Indexed:  {indexed_total:,} documents across 3 streams"
+          + (f"   [{error_count} errors]" if error_count else ""))
+    print(f"  Rate:     {rate:,.0f} docs/sec")
     print()
-    print(f"  Next steps:")
-    print(f"    1. Run bootstrap-classification.py to create ML jobs and templates")
-    print(f"    2. Start DFA jobs in Kibana: ML → Data Frame Analytics → ▶")
-    print(f"{'='*70}\n")
+    print(f"  Class balance written:")
+    print(f"    audit.is_suspicious = true:       ~{anomaly_pct}%  "
+          f"(~{round(sum(c for _,c in schedule)*anomaly_pct/100):,} docs)")
+    print(f"    ping_one.audit.risk.level = HIGH:  ~{anomaly_pct}%  "
+          f"(~{round(sum(c for _,c in schedule)*anomaly_pct/100):,} docs)")
+    print(f"    Oracle high-privilege actions:     ~{anomaly_pct}%  "
+          f"(~{round(sum(c for _,c in schedule)*anomaly_pct/100):,} docs)")
+    print(f"{'='*70}")
+
+    # Return tuple so main() can pass all three values to live_generate
+    today_entry = next((c for d, c in schedule if d == today), 0)
+    return days, epd, today_entry
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────
@@ -668,20 +916,34 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Standard run — 30 days, 2000 events/day/stream, 15% anomalies:
+  # Standard run — 30 days backfill then live generation:
   python sdg-prime-classification.py \\
       --host https://localhost:9200 \\
       --user elastic --password changeme --no-verify-ssl
 
-  # Custom parameters:
+  # High-volume with timezone (backfill + live):
   python sdg-prime-classification.py ... \\
-      --days 60 --events-per-day 5000 --anomaly-pct 20
+      --days 30 --events-per-day 100000 --anomaly-pct 15 \\
+      --timezone "America/New_York"
 
-  # Set timezone:
-  python sdg-prime-classification.py ... --timezone "America/New_York"
+  # Backfill only — no live generation:
+  python sdg-prime-classification.py ... \\
+      --days 30 --events-per-day 2000 --backfill-only
+
+  # Live only — skip backfill, generate new events going forward:
+  python sdg-prime-classification.py ... \\
+      --events-per-day 2000 --live-only
 
   # List timezones:
   python sdg-prime-classification.py --list-timezones
+
+Live generation notes:
+  After backfill completes the generator automatically calculates how many
+  events remain for today and generates them in real time. For example:
+    --events-per-day 100000, today backfill wrote 25,750 events
+    → live generates the remaining 74,250 events across today's hours
+  After today is complete it transitions to continuous full-day generation.
+  Press Ctrl+C at any time to stop.
         """
     )
     p.add_argument("--host",           default="https://localhost:9200")
@@ -698,13 +960,27 @@ Examples:
                         f"(default: {DEFAULT_ANOMALY_PCT}). "
                         f"Affects audit.is_suspicious, ping_one.audit.risk.level, "
                         f"and Oracle privilege fields.")
-    p.add_argument("--workers",  "-w", type=int,   default=6)
-    p.add_argument("--bulk-size","-b", type=int,   default=500)
-    p.add_argument("--pb-threads",     type=int,   default=2)
-    p.add_argument("--pb-queue",       type=int,   default=4)
+    p.add_argument("--workers",  "-w", type=int,   default=DEFAULT_WORKERS,
+                   help=f"Worker threads for backfill (default: {DEFAULT_WORKERS} "
+                        f"= {_CPU_CORES} CPU cores × 2, capped at 32). "
+                        f"Tasks are I/O bound so 2× cores is efficient.")
+    p.add_argument("--bulk-size","-b", type=int,   default=DEFAULT_BULK_SIZE,
+                   help=f"Documents per bulk request (default: {DEFAULT_BULK_SIZE})")
+    p.add_argument("--pb-threads",     type=int,   default=DEFAULT_PB_THREADS,
+                   help=f"parallel_bulk threads per worker (default: {DEFAULT_PB_THREADS} "
+                        f"= cores // 4, min 2, max 4)")
+    p.add_argument("--pb-queue",       type=int,   default=DEFAULT_PB_QUEUE,
+                   help=f"parallel_bulk queue depth (default: {DEFAULT_PB_QUEUE})")
     p.add_argument("--timezone",       default=None, metavar="TZ",
                    help="Timezone for timestamps (default: system local).")
     p.add_argument("--list-timezones", action="store_true")
+    p.add_argument("--backfill-only",  action="store_true",
+                   help="Stop after backfill completes — do not start live generation.")
+    p.add_argument("--live-only",      action="store_true",
+                   help="Skip backfill entirely and start live generation immediately. "
+                        "Useful when data already exists and you only want new events "
+                        "going forward. Sets backfill_today_count=0 so the full day "
+                        "target is generated for today.")
 
     # Read workshop-config.json if present
     _cfg = {}
@@ -740,20 +1016,54 @@ Examples:
 
     tz = resolve_tz(args.timezone)
 
-    backfill(
-        host        = args.host,
-        user        = args.user,
-        password    = args.password,
-        verify_ssl  = not args.no_verify_ssl,
-        days        = args.days,
-        epd         = args.events_per_day,
-        anomaly_pct = args.anomaly_pct,
-        tz          = tz,
-        workers     = args.workers,
-        bulk_size   = args.bulk_size,
-        pb_threads  = args.pb_threads,
-        pb_queue    = args.pb_queue,
-    )
+    ssl_opts = {"verify_certs": not args.no_verify_ssl, "ssl_show_warn": False}
+    if args.no_verify_ssl:
+        ssl_opts["ssl_assert_fingerprint"] = None
+    es = Elasticsearch(args.host, basic_auth=(args.user, args.password), **ssl_opts)
+
+    if args.live_only:
+        # Skip backfill — jump straight to live generation.
+        # backfill_today_count=0 means the full day target is generated for today.
+        print("\n  --live-only: skipping backfill, starting live generation immediately.")
+        live_generate(
+            es                   = es,
+            epd                  = args.events_per_day,
+            anomaly_pct          = args.anomaly_pct,
+            backfill_days        = 0,
+            backfill_today_count = 0,
+            bulk_size            = args.bulk_size,
+            pb_threads           = args.pb_threads,
+            pb_queue             = args.pb_queue,
+            tz                   = tz,
+        )
+    else:
+        backfill_days, backfill_epd, backfill_today_count = backfill(
+            host        = args.host,
+            user        = args.user,
+            password    = args.password,
+            verify_ssl  = not args.no_verify_ssl,
+            days        = args.days,
+            epd         = args.events_per_day,
+            anomaly_pct = args.anomaly_pct,
+            tz          = tz,
+            workers     = args.workers,
+            bulk_size   = args.bulk_size,
+            pb_threads  = args.pb_threads,
+            pb_queue    = args.pb_queue,
+        )
+
+        if not args.backfill_only:
+            live_generate(
+                es                   = es,
+                epd                  = args.events_per_day,
+                anomaly_pct          = args.anomaly_pct,
+                backfill_days        = backfill_days,
+                backfill_today_count = backfill_today_count,
+                bulk_size            = args.bulk_size,
+                pb_threads           = args.pb_threads,
+                pb_queue             = args.pb_queue,
+                tz                   = tz,
+            )
 
 
 if __name__ == "__main__":
