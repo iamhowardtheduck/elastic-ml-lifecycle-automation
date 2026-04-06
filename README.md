@@ -1,20 +1,55 @@
 # LendPath ML Classification Workshop
 ## Elastic Machine Learning — Focused Edition
 
-> *Learn how a fictional mortgage lender's data tells a story of risk — and how Elastic Machine Learning turns that story into real-time anomaly alerts, behavioral outliers, and predictive models that flag problems before they become losses.*
+> *Learn how a fictional mortgage lender's data tells a story of risk — and how Elastic
+> Machine Learning turns that story into real-time predictions, AI-assisted analysis,
+> and fully automated model creation.*
 
 ---
 
 ## What You'll Build
 
-This workshop has two parts. Each part uses different Elastic ML capabilities against real synthetic mortgage platform data — no toy datasets.
+Four chapters. Three data streams. Two classification models. One end-to-end automation arc.
 
-| | Part 1 | Part 2 |
+| | Chapter 1 | Chapter 2 |
 |---|---|---|
-| **Goal** | Deploy a trained model as a live inference pipeline | Use AI + Automation to build and train a new model |
+| **Goal** | Build, train, and deploy a DFA classification job manually | Use AI + Workflows to discover data, assess ML readiness, and automate job creation |
 | **Data** | PingOne IAM + Oracle DB audit | LendPath internal audit log |
 | **ML Job** | `mortgage-privileged-access-classification` | `mortgage-audit-classification` |
-| **Key tools** | DFA · Ingest Pipelines · Discover | Agent Builder · Elastic Workflows · DFA |
+| **Key tools** | DFA · Dev Tools · Ingest Pipelines · Discover | Agent Builder · Elastic Workflows · DFA |
+
+---
+
+## Workshop Structure
+
+```
+Chapter 0 — Setup & Environment Review
+  Verify data, explore streams, understand the LendPath scenario
+
+Chapter 1 — Build and Train a Classification Job
+  1.1  Explore source data in Discover
+  1.2  Check class balance with ES|QL
+  1.3  Create the DFA job via Dev Tools (includes, excludes, hyperparameters)
+  1.4  Start and monitor training
+  1.5  Explore results: confusion matrix, feature importance, hyperparameter stats
+  1.6  Confirm the trained model
+  1.7  Deploy as an ingest pipeline
+  1.8  Wire the pipeline to both source indices
+  1.9  Observe live predictions in Discover
+
+Chapter 2 — AI Agent Analysis and Workflow Automation
+  2.1  Enable Workflows
+  2.2  Build the ML Readiness Analyst agent (built-in platform tools only)
+  2.3  Chat with the agent — schema discovery, class balance, feature analysis
+  2.4  Build the parameterised Automation Workflow
+  2.5  Review workflow execution log
+  2.6  Start the job and monitor training
+  2.7  Deploy as inference pipeline
+
+Chapter 3 — Final Thoughts & Take-Aways
+  The three automation levels
+  Student challenge: apply to a network traffic dataset
+```
 
 ---
 
@@ -29,32 +64,36 @@ This workshop has two parts. Each part uses different Elastic ML capabilities ag
 │                      │  -mortgage           │                       │
 │  IAM events          │  DB audit events     │  Internal audit log   │
 │  • risk.score        │  • action            │  • risk_score         │
-│  • action.type       │  • privilege         │  • is_suspicious      │
+│  • action.type       │  • privilege         │  • is_suspicious ◄─── label
 │  • result.status     │  • event.outcome     │  • mfa_used           │
-│  • risk.level ←label │                      │  • off_hours          │
+│  • risk.level ◄──────┼── label              │  • off_hours          │
 └──────────┬───────────┴──────────┬───────────┴──────────┬────────────┘
            │                     │                       │
            └──────────┬──────────┘                       │
                       ▼                                   ▼
-        ┌─────────────────────────┐        ┌─────────────────────────┐
-        │  PART 1                 │        │  PART 2                 │
-        │  DFA Classification     │        │  Agent Builder          │
-        │  mortgage-privileged-   │        │  analyzes data, then    │
-        │  access-classification  │        │  Workflow creates and   │
-        │                         │        │  configures DFA job     │
-        │  Predicts: LOW/MED/HIGH │        │  mortgage-audit-        │
-        └──────────┬──────────────┘        │  classification         │
-                   │                       └──────────┬──────────────┘
-                   ▼                                  ▼
-        ┌─────────────────────────┐        ┌─────────────────────────┐
-        │  Ingest Pipeline        │        │  Ingest Pipeline        │
-        │  mortgage-privileged-   │        │  mortgage-audit-ml      │
-        │  access-ml              │        │                         │
-        │                         │        │  ml.is_suspicious_      │
-        │  ml.risk_level_         │        │  prediction on every    │
-        │  prediction on every    │        │  new audit event        │
-        │  new IAM/DB event       │        └─────────────────────────┘
-        └─────────────────────────┘
+       ┌──────────────────────────┐       ┌──────────────────────────┐
+       │  CHAPTER 1               │       │  CHAPTER 2               │
+       │  mortgage-privileged-    │       │  Agent Builder           │
+       │  access-classification   │       │  → discovers schema      │
+       │                          │       │  → assesses ML readiness │
+       │  Classes: LOW/MED/HIGH   │       │  → triggers Workflow     │
+       │  Source: PingOne+Oracle  │       │                          │
+       └─────────────┬────────────┘       │  Elastic Workflow        │
+                     │                    │  → checks data readiness │
+                     ▼                    │  → creates DFA job       │
+       ┌──────────────────────────┐       │  mortgage-audit-         │
+       │  Ingest Pipeline         │       │  classification          │
+       │  mortgage-privileged-    │       └─────────────┬────────────┘
+       │  access-ml               │                     │
+       │                          │                     ▼
+       │  ml.risk_level_prediction│       ┌──────────────────────────┐
+       │  on every new event      │       │  Ingest Pipeline         │
+       └──────────────────────────┘       │  mortgage-audit-ml       │
+                                          │                          │
+                                          │  ml.is_suspicious_       │
+                                          │  prediction on every     │
+                                          │  new audit event         │
+                                          └──────────────────────────┘
 ```
 
 ---
@@ -63,11 +102,12 @@ This workshop has two parts. Each part uses different Elastic ML capabilities ag
 
 | File | Purpose |
 |---|---|
-| `bootstrap-classification.py` | Creates index templates, DFA jobs, Kibana data views |
-| `sdg-prime-classification.py` | Generates synthetic data for all 3 streams |
+| `bootstrap-classification.py` | Creates index templates, data streams, patches mappings, Kibana data views |
+| `sdg-prime-classification.py` | Generates synthetic data — backfill + live generation |
 | `classification-workshop.yml` | SDG field schema reference |
 | `business_calendar.py` | US Federal holiday + diurnal pattern calendar |
-| `WORKSHOP_FOCUSED.md` | Full instructor guide |
+| `WORKSHOP_FOCUSED.md` | Full instructor/student workshop guide |
+| `WORKSHOP_FOCUSED.html` | HTML version with copy buttons on all code blocks |
 | `WORKSHOP_FOCUSED.pdf` | Printable version |
 
 ---
@@ -77,9 +117,9 @@ This workshop has two parts. Each part uses different Elastic ML capabilities ag
 ### Prerequisites
 
 - Elastic Stack 9.2+ or Serverless
-- Workflows feature enabled
-- LLM connector configured (OpenAI, Azure OpenAI, Bedrock, or local)
-- Python 3.9+ with `elasticsearch` and `faker` packages
+- Workflows feature enabled in Advanced Settings
+- LLM connector configured (OpenAI, Azure OpenAI, Bedrock, or local model)
+- Python 3.9+ with dependencies:
 
 ```bash
 pip install elasticsearch faker
@@ -87,8 +127,9 @@ pip install elasticsearch faker
 
 ### Step 1 — Bootstrap
 
-Creates index templates, DFA job definitions, and Kibana data views.
-Saves `workshop-config.json` so subsequent scripts need no connection args.
+Creates index templates with cross-index consistent field mappings, explicit data
+streams, patches any existing backing index mappings, and creates Kibana data views.
+Saves `workshop-config.json` so subsequent scripts pick up connection settings automatically.
 
 ```bash
 python bootstrap-classification.py \
@@ -101,8 +142,8 @@ python bootstrap-classification.py \
 
 ### Step 2 — Generate Data
 
-Generates 30 days of synthetic data across all 3 streams.
-Reads connection settings from `workshop-config.json` automatically.
+Backfills historical data across all three streams then automatically transitions
+to live generation, producing new events in real time until stopped.
 
 ```bash
 python sdg-prime-classification.py \
@@ -112,49 +153,49 @@ python sdg-prime-classification.py \
     --timezone "America/New_York"
 ```
 
-**Parameter guide:**
+**Generation modes:**
+
+| Mode | Command | Behaviour |
+|---|---|---|
+| Default | *(no flag)* | Backfill N days, then live generation |
+| Backfill only | `--backfill-only` | Stop after backfill, no live generation |
+| Live only | `--live-only` | Skip backfill, generate new events from now |
+
+**Live generation behaviour:** After backfill completes, the generator calculates how
+many events were already written for today and generates only the remaining quota.
+Example: `--events-per-day 100000`, backfill wrote 25,750 events today →
+live mode generates the remaining 74,250 across today's remaining hours.
+
+**Full parameter reference:**
 
 | Parameter | Default | Notes |
 |---|---|---|
-| `--days` | 30 | Historical window. 30 days gives the model good baseline coverage. |
-| `--events-per-day` | 2000 | Per stream per weekday. Weekends auto-reduced to 15%. |
-| `--anomaly-pct` | 15 | % of events labeled as anomalous. Keep between 10–30% for a balanced model. |
-| `--timezone` | System local | Must match your Kibana browser timezone or the diurnal peak will appear shifted. |
-| `--backfill-only` | off | Stop after backfill completes — skip live generation. |
+| `--days` | 30 | Historical backfill window |
+| `--events-per-day` | 2000 | Per stream, per weekday. Weekends = 15% |
+| `--anomaly-pct` | 15 | % anomalous events. Keep 10–30% for good class balance |
+| `--timezone` | System local | Must match Kibana browser timezone |
+| `--workers` | CPU cores × 2 | Backfill parallelism. Auto-detected, cap 32 |
+| `--backfill-only` | off | Stop after backfill |
+| `--live-only` | off | Skip backfill, live events only |
 
-After the backfill completes the generator **automatically transitions to live mode**:
-it calculates how many events were already written for today, generates only the
-remaining events for the rest of the day at real-time rate, then rolls into
-continuous full-day generation until you press Ctrl+C.
-
-Example: `--events-per-day 100000`, backfill wrote 25,750 events for today →
-live mode generates the remaining 74,250 events spread across today's remaining hours.
-
-**List available timezones:**
 ```bash
+# List available timezones
 python sdg-prime-classification.py --list-timezones
 ```
 
-**Backfill only (no live generation):**
-```bash
-python sdg-prime-classification.py ... --backfill-only
-```
+### Step 3 — Follow the Workshop Guide
 
-### Step 3 — Start Part 1
+Open `WORKSHOP_FOCUSED.html` or `WORKSHOP_FOCUSED.pdf` and begin at Chapter 0.
 
-Start the `mortgage-privileged-access-classification` DFA job in Kibana and follow the Part 1 instructions in `WORKSHOP_FOCUSED.md`.
+The DFA jobs are **not** pre-created by bootstrap:
 
-**Kibana → Machine Learning → Data Frame Analytics → mortgage-privileged-access-classification → ▶**
+- `mortgage-privileged-access-classification` → created by the student in Chapter 1 via Dev Tools
+- `mortgage-audit-classification` → created automatically by the Elastic Workflow in Chapter 2
 
-### Step 4 — Start Part 2
-
-Enable Workflows in Stack Management, then follow the Part 2 instructions to build the AI Agent and automation Workflow.
-
-**Kibana → Stack Management → Advanced Settings → Enable Elastic Workflows**
-
-### Purge and Reset
+### Step 4 — Purge and Reset
 
 ```bash
+# With confirmation prompt
 python bootstrap-classification.py \
     --host https://your-es-host:9200 \
     --kibana-host http://your-kibana:5601 \
@@ -162,258 +203,155 @@ python bootstrap-classification.py \
     --no-verify-ssl \
     --purge
 
-# Skip confirmation prompt:
+# Skip the YES prompt
 python bootstrap-classification.py ... --purge --force
 ```
 
----
-
-## Part 1 — Privileged Access Pipeline
-
-### What it does
-
-Trains a classification model on cross-source data combining PingOne IAM signals with Oracle database privilege data, then deploys it as an ingest pipeline so every new event is scored automatically.
-
-### Data flow
-
-```
-  logs-ping_one.audit-mortgage          logs-oracle.database_audit-mortgage
-  ┌─────────────────────────────┐       ┌────────────────────────────────────┐
-  │ ping_one.audit.risk.score   │       │ oracle.database_audit.action       │
-  │ ping_one.audit.action.type  │       │ oracle.database_audit.privilege    │
-  │ ping_one.audit.result.status│       │ event.outcome                      │
-  │ event.outcome               │       │                                    │
-  │ ping_one.audit.risk.level   │       │  (Oracle docs: PingOne fields null)│
-  │ (dependent variable) ◄──────┼───────┼──► Model handles nulls: trained on │
-  └──────────────┬──────────────┘       │   same mixed-source dataset        │
-                 │                      └─────────────────┬──────────────────┘
-                 └──────────────────┬───────────────────┘
-                                    ▼
-                    ┌───────────────────────────────┐
-                    │  DFA Classification Job        │
-                    │  mortgage-privileged-access-   │
-                    │  classification                │
-                    │                               │
-                    │  Training: 80%  Test: 20%     │
-                    │  Classes: LOW / MEDIUM / HIGH  │
-                    │  Objective: maximize_minimum_  │
-                    │            recall              │
-                    └──────────────┬────────────────┘
-                                   │  Trained model →
-                                   ▼
-                    ┌───────────────────────────────┐
-                    │  Ingest Pipeline               │
-                    │  mortgage-privileged-access-ml │
-                    │                               │
-                    │  Applied to BOTH indices       │
-                    │  PingOne fields null for       │
-                    │  Oracle docs → handled         │
-                    │                               │
-                    │  Writes to each document:      │
-                    │  ml.risk_level_prediction      │
-                    │  ml.top_classes[].probability  │
-                    │  ml.inference_error (on fail)  │
-                    └───────────────────────────────┘
-```
-
-### Steps summary
-
-1. Confirm trained model exists: `GET /_ml/trained_models?tags=mortgage-privileged-access-classification`
-2. Create ingest pipeline `mortgage-privileged-access-ml` with the inference processor
-3. Simulate against PingOne doc and Oracle doc to verify null handling
-4. Apply pipeline to current backing indices for both streams
-5. Update both index templates so future rollovers inherit the pipeline
-6. Open Discover → filter on `ml.risk_level_prediction: HIGH`
-
-### Key insight
-
-> A PingOne document has null Oracle fields. An Oracle document has null PingOne fields. The model was trained on the same mixed dataset so it already knows how to score either document type with only half the features present. No special handling needed — `on_failure` catches the edge cases.
-
----
-
-## Part 2 — AI Agent + Workflow Automation
-
-### What it does
-
-Uses Elastic Agent Builder to analyze historical audit data and surface ML readiness signals, then uses Elastic Workflows to automatically create and configure the `mortgage-audit-classification` DFA job — replacing what would otherwise be a manual multi-step process.
-
-### Exercise flow
-
-```
-  ┌─────────────────────────────────────────────────────────────────┐
-  │                    logs-mortgage.audit-default                   │
-  │   audit.risk_score · audit.is_suspicious · audit.mfa_used       │
-  │   audit.off_hours · audit.new_device · user.roles               │
-  │   event.action · source.geo.country_iso_code                    │
-  └────────────────────────────┬────────────────────────────────────┘
-                               │
-              ┌────────────────▼────────────────┐
-              │         AI AGENT                │
-              │  "LendPath Audit ML Analyst"    │
-              │                                 │
-              │  Tool 1: Audit Risk Analysis    │
-              │  → ES|QL: stats by user.roles   │
-              │                                 │
-              │  Tool 2: Suspicious Details     │
-              │  → ES|QL: top risky events      │
-              │                                 │
-              │  Tool 3: Feature Distribution   │
-              │  → ES|QL: class balance check   │
-              │                                 │
-              │  Output: "15.2% suspicious,     │
-              │  data is suitable for training, │
-              │  top features: off_hours,        │
-              │  new_device, risk_score"        │
-              └────────────────┬────────────────┘
-                               │  Human reviews recommendation
-                               ▼
-              ┌────────────────────────────────────────────────────┐
-              │              ELASTIC WORKFLOW YAML                  │
-              │  Trigger: manual                                    │
-              │                                                     │
-              │  Step 1: count_total_docs ────► check ≥ 5,000 docs │
-              │  Step 2: count_suspicious  ─┐                      │
-              │  Step 3: count_not_suspicious┘► log class balance  │
-              │  Step 4: check_job_exists ────► skip if exists     │
-              │  Step 5: create_dfa_job ──────► PUT to ML API      │
-              │  Step 6: final_summary ───────► log all counts     │
-              └────────────────┬───────────────────────────────────┘
-                               │  Job created — human reviews config
-                               ▼
-              ┌─────────────────────────────────┐
-              │  DFA Classification Job          │
-              │  mortgage-audit-classification  │
-              │                                 │
-              │  Source: audit-default          │
-              │  Label:  audit.is_suspicious    │
-              │  Train:  80%  Test: 20%         │
-              │  ▶ Started manually in Kibana   │
-              └────────────────┬────────────────┘
-                               │  Training complete →
-                               ▼
-              ┌─────────────────────────────────┐
-              │  Ingest Pipeline                 │
-              │  mortgage-audit-ml              │
-              │                                 │
-              │  ml.is_suspicious_prediction    │
-              │  ml.prediction_probability      │
-              │  ml.top_classes                 │
-              └─────────────────────────────────┘
-```
-
-### The three automation levels
-
-```
-  LEVEL 1 — MANUAL                    You configure everything by hand.
-  ────────────────────────────────    Full control. Takes 20–30 minutes.
-  Create pipeline → wire indices
-
-  LEVEL 2 — AI ASSISTED               Agent analyzes your actual data
-  ────────────────────────────────    and tells you what to configure.
-  Agent Builder → chat → insight      Takes 5 minutes of conversation.
-
-  LEVEL 3 — AUTOMATED                 Workflow does the work.
-  ────────────────────────────────    Data check → job create → summary.
-  Elastic Workflows → YAML → run      Takes 30 seconds.
-```
-
-### Why the Workflow intentionally doesn't auto-start the job
-
-The Workflow creates the DFA job but stops short of starting it. In a mortgage compliance environment, an analyst reviews the job configuration before training begins — the model will score real audit events in production, so a human checkpoint before training is the right call. To add auto-start, add one step to the YAML after `create_dfa_job`:
-
-```yaml
-- name: start_dfa_job
-  type: elasticsearch.request
-  with:
-    method: POST
-    path: "/_ml/data_frame/analytics/{{ consts.jobId }}/_start"
-```
+Purge removes both DFA jobs, destination indices, all three data streams (and their
+backing indices), index templates, and Kibana data views. Trained models are **not**
+purged — delete those manually in Kibana under Machine Learning → Trained Models.
 
 ---
 
 ## Data Generation Details
 
-### Anomaly embedding logic
+### Three streams, three purposes
 
-The generator doesn't randomly flip a label — it correlates suspicious signals so the model has real patterns to learn:
-
-**Audit anomalies (`audit.is_suspicious = true`)**
-
-```
-  risk_score       → 65–100  (vs 0–50 for normal)
-  off_hours        → 75% true  (vs 10%)
-  new_device       → 70% true  (vs 5%)
-  mfa_used         → 20% true  (vs 85%)
-  event.action     → bulk_export, admin_impersonation,
-                     ssn_accessed, rate_overridden ...
-  source.geo       → 60% foreign country  (vs domestic)
-```
-
-**PingOne anomalies (`ping_one.audit.risk.level = HIGH`)**
-
-```
-  risk.score       → 60–100  (vs 0–40 for normal)
-  result.status    → FAILED / BLOCKED / REQUIRES_MFA
-  event.action     → USER.MFA.BYPASS, USER.AUTHENTICATION.FAILED,
-                     USER.ACCOUNT.LOCKED, ADMIN.POLICY.UPDATED ...
-  event.outcome    → failure  (65%)
-```
-
-**Oracle anomalies (high-privilege actions)**
-
-```
-  privilege        → SYSDBA / DBA / CREATE ANY PROCEDURE
-  action           → DROP TABLE, DROP USER, GRANT,
-                     EXPORT, CREATE OR REPLACE PROCEDURE ...
-  event.outcome    → success + high privilege = most suspicious
-```
-
-### Calendar behavior
-
-| Day type | Volume | Source |
+| Stream | Label field | Used in |
 |---|---|---|
-| Weekday (non-holiday) | 100% of `--events-per-day` | `business_calendar.py` |
-| Weekend | 15% of `--events-per-day` | `business_calendar.py` |
-| US Federal holiday | 15% of `--events-per-day` | `business_calendar.py` |
-| Fallback (no calendar) | weekday/weekend only | `d.weekday() >= 5` |
+| `logs-ping_one.audit-mortgage` | `ping_one.audit.risk.level` (LOW/MEDIUM/HIGH) | Chapter 1 — source for `mortgage-privileged-access-classification` |
+| `logs-oracle.database_audit-mortgage` | *(no label — provides cross-source features)* | Chapter 1 — second source for same job |
+| `logs-mortgage.audit-default` | `audit.is_suspicious` (boolean) | Chapter 2 — source for `mortgage-audit-classification` |
 
-Diurnal pattern peaks at 10:00–12:00 local time, near-zero 22:00–05:00.
+### Anomaly embedding
+
+The generator doesn't randomly flip labels — it correlates signals so the model
+has real patterns to learn from.
+
+**Audit stream — `audit.is_suspicious = true` (~anomaly-pct % of events)**
+
+```
+risk_score     → 65–100      (normal: 0–50)
+off_hours      → 75% true    (normal: 10%)
+new_device     → 70% true    (normal: 5%)
+mfa_used       → 20% true    (normal: 85%)
+event.action   → bulk_export, admin_impersonation, ssn_accessed, rate_overridden
+source.geo     → 60% foreign (normal: domestic)
+```
+
+**PingOne stream — `ping_one.audit.risk.level = HIGH` (~anomaly-pct % of events)**
+
+```
+risk.score     → 60–100      (normal: 0–40)
+result.status  → FAILED / BLOCKED / REQUIRES_MFA
+event.action   → USER.MFA.BYPASS, USER.AUTHENTICATION.FAILED, USER.ACCOUNT.LOCKED
+event.outcome  → failure (65%)
+```
+
+**Oracle stream — high-privilege actions (~anomaly-pct % of events)**
+
+```
+privilege      → SYSDBA / DBA / CREATE ANY PROCEDURE
+action         → DROP TABLE, DROP USER, GRANT, EXPORT, CREATE OR REPLACE PROCEDURE
+event.outcome  → success + high privilege = most suspicious combination
+```
+
+### Calendar and diurnal pattern
+
+| Day type | Volume |
+|---|---|
+| Weekday (non-holiday) | 100% of `--events-per-day` |
+| Weekend | 15% of `--events-per-day` |
+| US Federal holiday | 15% of `--events-per-day` |
+
+Peak hours: 10:00–12:00 local time. Near-zero: 22:00–05:00.
+
+---
+
+## Cross-Index Mapping Consistency
+
+The `mortgage-privileged-access-classification` job sources from two separate indices.
+Elasticsearch requires that any field shared across both indices has **identical
+mapping definitions** — otherwise the DFA job fails to start with a merge error.
+
+Bootstrap ensures consistency across four shared field groups:
+
+| Field group | PingOne template | Oracle template |
+|---|---|---|
+| `event.*` | `kind, category, type, action, outcome, dataset` | identical |
+| `user.*` | `id, name, email, roles` | identical |
+| `client.user.*` | `id, name` | identical |
+| `source.*` | `ip, geo.*` | identical |
+
+`patch_existing_mappings()` applies these to all current backing indices at runtime,
+so re-running bootstrap on a populated cluster fixes mapping gaps without purging data.
 
 ---
 
 ## Troubleshooting
 
+**DFA job fails to start — mapping merge error**
+
+```
+cannot merge [properties] mappings because of differences for field [client]
+```
+
+Re-run bootstrap. `patch_existing_mappings()` will apply the correct shared mapping
+to all current backing indices. If the problem persists, apply manually:
+
+```
+PUT /logs-oracle.database_audit-mortgage/_settings
+{ ... }   ← see Chapter 0 in WORKSHOP_FOCUSED.md for the full payload
+```
+
 **`No field [audit.is_suspicious] could be detected`**
-Bootstrap must run before the generator. The index template creates the boolean mapping — without it, Elasticsearch maps `audit.is_suspicious` as keyword and DFA rejects it.
+
+Bootstrap must run before the generator. The index template sets the boolean mapping.
+Without it, Elasticsearch maps the field as keyword and DFA rejects it.
 
 **`No known trained model with model_id [mortgage-privileged-access-classification]`**
-Outlier detection jobs don't produce trained models. Classification jobs do. Confirm the DFA job has completed and is in the `inference` phase, then get the full timestamped model ID:
+
+The job must complete all training phases including `inference`. Get the full
+timestamped model ID:
+
 ```
 GET /_ml/trained_models?tags=mortgage-privileged-access-classification&human=true
 ```
 
 **Pipeline not scoring new documents**
-The index template update only affects future rollovers. Apply the pipeline to the current backing index directly:
+
+Apply the pipeline directly to the data stream — this propagates to the current
+backing index and all future rollovers:
+
 ```
-GET /_cat/indices/.ds-logs-ping_one.audit-mortgage*?v&h=index
-PUT /.ds-logs-ping_one.audit-mortgage-<date>-000001/_settings
+PUT /logs-ping_one.audit-mortgage/_settings
+{ "index": { "default_pipeline": "mortgage-privileged-access-ml" } }
+
+PUT /logs-oracle.database_audit-mortgage/_settings
 { "index": { "default_pipeline": "mortgage-privileged-access-ml" } }
 ```
 
 **Agent Builder not visible in Kibana**
-Requires Elastic Stack 9.2+ or Serverless. On self-managed, enable via:
-```
-Stack Management → Advanced Settings → Enable Agent Builder
-```
+
+Requires Elastic Stack 9.2+ or Serverless. Enable via:
+`Stack Management → Advanced Settings → Enable Agent Builder`
 
 **Workflows not in navigation**
-```
-Stack Management → Advanced Settings → Enable Elastic Workflows
-```
-Then refresh Kibana — Workflows appears under Analytics in the left nav.
 
-**Diurnal peak appears shifted in dashboards**
-The generator used UTC while your Kibana browser is in a different timezone. Purge and re-run with the correct timezone:
+`Stack Management → Advanced Settings → Enable Elastic Workflows`
+then refresh — Workflows appears under Analytics in the left nav.
+
+**Agent hangs on unfamiliar clusters without generating output**
+
+The system prompt instructs the agent to call `list_indices` as its mandatory first
+action. If your agent was created before this was added, update the system prompt —
+see the ML Readiness Analyst system prompt in Chapter 2 of WORKSHOP_FOCUSED.md.
+
+**Diurnal peak appears shifted in Kibana dashboards**
+
+The generator used UTC while your browser is in a different timezone. Purge and
+re-run with the correct timezone flag:
+
 ```bash
 python sdg-prime-classification.py ... --timezone "America/New_York"
 ```
