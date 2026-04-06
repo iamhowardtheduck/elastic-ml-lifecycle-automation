@@ -9,10 +9,16 @@ Creates ONLY what is needed for the two classification jobs:
   • mortgage-privileged-access-classification
 
 What this does:
-  1. Creates index templates for the 3 data streams
-  2. Creates both DFA job definitions (stopped — start manually)
-  3. Creates Kibana data views for both destination indices
-  4. Saves workshop-config.json for use by sdg-prime-classification.py
+  1. Creates index templates for the 3 data streams with cross-index consistent
+     mappings (prevents DFA merge failures when using multiple source indices)
+  2. Creates the 3 data streams explicitly
+  3. Patches existing backing index mappings to match templates
+  4. Creates Kibana data views for source and destination indices
+  5. Saves workshop-config.json for use by sdg-prime-classification.py
+
+  DFA jobs are NOT created by bootstrap:
+  • mortgage-privileged-access-classification → student creates via Dev Tools (Part 1)
+  • mortgage-audit-classification             → Elastic Workflow creates automatically (Part 2)
 
 Usage:
   python bootstrap-classification.py \\
@@ -118,6 +124,11 @@ def create_templates(host, auth, verify_ssl):
             "settings": _common_settings("logs"),
             "mappings": {
                 "properties": {
+                    # ── ECS base ──────────────────────────────────────────────
+                    "ecs":     {"properties": {"version": {"type": "keyword"}}},
+                    "tags":    {"type": "keyword"},
+                    "message": {"type": "text"},
+                    # ── event ─────────────────────────────────────────────────
                     "event": {"properties": {
                         "kind":     {"type": "keyword"},
                         "category": {"type": "keyword"},
@@ -126,20 +137,30 @@ def create_templates(host, auth, verify_ssl):
                         "outcome":  {"type": "keyword"},
                         "dataset":  {"type": "keyword"},
                     }},
+                    # ── user — all subfields explicit so excludes work cleanly
                     "user": {"properties": {
-                        "id":    {"type": "keyword"},
-                        "name":  {"type": "keyword"},
-                        "email": {"type": "keyword"},
-                        "roles": {"type": "keyword"},
+                        "id":       {"type": "keyword"},
+                        "name":     {"type": "keyword"},
+                        "email":    {"type": "keyword"},
+                        "roles":    {"type": "keyword"},
+                        "full_name":{"type": "keyword"},
                     }},
+                    # ── source ────────────────────────────────────────────────
                     "source": {"properties": {
                         "ip": {"type": "ip"},
                         "geo": {"properties": {
                             "country_iso_code": {"type": "keyword"},
                             "city_name":        {"type": "keyword"},
                             "region_name":      {"type": "keyword"},
+                            "location":         {"type": "geo_point"},
                         }},
                     }},
+                    # ── host ──────────────────────────────────────────────────
+                    "host": {"properties": {
+                        "hostname": {"type": "keyword"},
+                        "name":     {"type": "keyword"},
+                    }},
+                    # ── audit ML features — dependent variable + all features ─
                     "audit": {"properties": {
                         "risk_score":    {"type": "float"},
                         "is_suspicious": {"type": "boolean"},
@@ -149,12 +170,6 @@ def create_templates(host, auth, verify_ssl):
                         "new_device":    {"type": "boolean"},
                         "vpn_detected":  {"type": "boolean"},
                     }},
-                    "host": {"properties": {
-                        "hostname": {"type": "keyword"},
-                        "name":     {"type": "keyword"},
-                    }},
-                    "message": {"type": "text"},
-                    "tags":    {"type": "keyword"},
                 }
             }
         }
@@ -169,33 +184,50 @@ def create_templates(host, auth, verify_ssl):
             "settings": _common_settings("logs"),
             "mappings": {
                 "properties": {
+                    # ── ECS base ──────────────────────────────────────────────
+                    "ecs":  {"properties": {"version": {"type": "keyword"}}},
+                    "tags": {"type": "keyword"},
+                    "input":{"properties": {"type": {"type": "keyword"}}},
+                    # ── event — must match Oracle template exactly ─────────────
                     "event": {"properties": {
                         "kind":     {"type": "keyword"},
                         "category": {"type": "keyword"},
-                        "dataset":  {"type": "keyword"},
+                        "type":     {"type": "keyword"},
                         "action":   {"type": "keyword"},
                         "outcome":  {"type": "keyword"},
-                        "type":     {"type": "keyword"},
+                        "dataset":  {"type": "keyword"},
                     }},
+                    # ── user — must match Oracle template exactly ──────────────
+                    # All four subfields declared in both templates so the DFA
+                    # cross-index merge never sees a structural difference.
+                    # user.id and user.name are in the DFA excludes list;
+                    # they must still be mapped or the excludes directive errors.
                     "user": {"properties": {
                         "id":    {"type": "keyword"},
-                        "email": {"type": "keyword"},
                         "name":  {"type": "keyword"},
+                        "email": {"type": "keyword"},
+                        "roles": {"type": "keyword"},
                     }},
+                    # ── client.user — must match Oracle template exactly ────────
                     "client": {"properties": {
                         "user": {"properties": {
                             "id":   {"type": "keyword"},
                             "name": {"type": "keyword"},
                         }}
                     }},
+                    # ── source — must match Oracle template exactly ─────────────
                     "source": {"properties": {
                         "ip": {"type": "ip"},
                         "geo": {"properties": {
                             "country_iso_code": {"type": "keyword"},
                             "city_name":        {"type": "keyword"},
                             "region_name":      {"type": "keyword"},
+                            "location":         {"type": "geo_point"},
                         }},
                     }},
+                    # ── PingOne-specific fields ────────────────────────────────
+                    # These are only in PingOne documents; Oracle docs will have
+                    # null values for these fields — no merge conflict.
                     "ping_one": {"properties": {
                         "audit": {"properties": {
                             "action":  {"properties": {"type": {"type": "keyword"}}},
@@ -213,7 +245,6 @@ def create_templates(host, auth, verify_ssl):
                             }},
                         }}
                     }},
-                    "tags": {"type": "keyword"},
                 }
             }
         }
@@ -228,23 +259,58 @@ def create_templates(host, auth, verify_ssl):
             "settings": _common_settings("logs"),
             "mappings": {
                 "properties": {
+                    # ── ECS base ──────────────────────────────────────────────
+                    "ecs":  {"properties": {"version": {"type": "keyword"}}},
+                    "tags": {"type": "keyword"},
+                    # ── event — must match PingOne template exactly ─────────────
                     "event": {"properties": {
                         "kind":     {"type": "keyword"},
                         "category": {"type": "keyword"},
-                        "action":   {"type": "keyword"},
-                        "dataset":  {"type": "keyword"},
-                        "outcome":  {"type": "keyword"},
                         "type":     {"type": "keyword"},
+                        "action":   {"type": "keyword"},
+                        "outcome":  {"type": "keyword"},
+                        "dataset":  {"type": "keyword"},
                     }},
+                    # ── user — must match PingOne template exactly ──────────────
+                    # All four subfields declared so the DFA merge never sees a
+                    # structural difference between this and the PingOne template.
+                    # user.id and user.name must exist here even though most Oracle
+                    # documents don't populate them — presence in mapping is what
+                    # the merge check requires, not presence in documents.
+                    "user": {"properties": {
+                        "id":    {"type": "keyword"},
+                        "name":  {"type": "keyword"},
+                        "email": {"type": "keyword"},
+                        "roles": {"type": "keyword"},
+                    }},
+                    # ── client.user — must match PingOne template exactly ────────
                     "client": {"properties": {
-                        "user": {"properties": {"name": {"type": "keyword"}}}
+                        "user": {"properties": {
+                            "id":   {"type": "keyword"},
+                            "name": {"type": "keyword"},
+                        }}
                     }},
-                    "user":   {"properties": {"roles": {"type": "keyword"}}},
+                    # ── source — must match PingOne template exactly ─────────────
+                    # Oracle documents don't have source.ip or source.geo but the
+                    # field must be defined identically for the merge to succeed.
+                    "source": {"properties": {
+                        "ip": {"type": "ip"},
+                        "geo": {"properties": {
+                            "country_iso_code": {"type": "keyword"},
+                            "city_name":        {"type": "keyword"},
+                            "region_name":      {"type": "keyword"},
+                            "location":         {"type": "geo_point"},
+                        }},
+                    }},
+                    # ── Oracle-specific fields ─────────────────────────────────
+                    # These are only in Oracle documents; PingOne docs will have
+                    # null values for these fields — no merge conflict.
                     "server": {"properties": {
                         "address": {"type": "keyword"},
                         "domain":  {"type": "keyword"},
                     }},
                     "process": {"properties": {"pid": {"type": "integer"}}},
+                    "related": {"properties": {"hosts": {"type": "keyword"}}},
                     "oracle": {"properties": {
                         "database_audit": {"properties": {
                             "action":         {"type": "keyword"},
@@ -263,116 +329,132 @@ def create_templates(host, auth, verify_ssl):
                             "terminal":    {"type": "keyword"},
                         }}
                     }},
-                    "related": {"properties": {"hosts": {"type": "keyword"}}},
-                    "tags":    {"type": "keyword"},
                 }
             }
         }
     }, auth, verify_ssl, "Template: logs-oracle.database_audit")
 
 
+# ── Data streams ──────────────────────────────────────────────────────────────
+
+def create_data_streams(host, auth, verify_ssl):
+    print("\n▸ Creating data streams…")
+    for ds in [
+        "logs-mortgage.audit-default",
+        "logs-ping_one.audit-mortgage",
+        "logs-oracle.database_audit-mortgage",
+    ]:
+        status, resp = _request(f"{host}/_data_stream/{ds}", "PUT", None, auth, verify_ssl)
+        if status in (200, 201):
+            print(f"  ✓ [{status}] Data stream: {ds}")
+        elif status == 400 and "already_exists" in str(resp).lower():
+            print(f"  ~ [exists] Data stream: {ds}")
+        else:
+            # May already exist from prior run — check
+            chk, _ = _request(f"{host}/_data_stream/{ds}", "GET", None, auth, verify_ssl)
+            if chk == 200:
+                print(f"  ~ [exists] Data stream: {ds}")
+            else:
+                print(f"  ✗ [{status}] Data stream: {ds}  {resp.get('error',{}).get('reason','')[:80]}")
+
+
+# ── Patch existing backing index mappings ─────────────────────────────────────
+# Called after templates are created so that any already-existing backing indices
+# receive the same mapping updates the new template would apply to future indices.
+# This prevents DFA cross-index merge failures caused by structural differences
+# between PingOne and Oracle backing indices.
+
+def patch_existing_mappings(host, auth, verify_ssl):
+    print("\n▸ Patching existing backing index mappings…")
+
+    # Shared fields that MUST be identical in both PingOne and Oracle indices
+    # for the DFA cross-index merge to succeed. We PUT these on all existing
+    # backing indices for both data streams — safe to re-apply, mapping updates
+    # are additive and never remove or change existing field types.
+
+    shared_mapping = {
+        "properties": {
+            "event": {"properties": {
+                "kind":     {"type": "keyword"},
+                "category": {"type": "keyword"},
+                "type":     {"type": "keyword"},
+                "action":   {"type": "keyword"},
+                "outcome":  {"type": "keyword"},
+                "dataset":  {"type": "keyword"},
+            }},
+            # All four user subfields must exist in both indices.
+            # user.id and user.name appear in the DFA excludes list —
+            # they must be mapped even if most Oracle docs don't have them.
+            "user": {"properties": {
+                "id":    {"type": "keyword"},
+                "name":  {"type": "keyword"},
+                "email": {"type": "keyword"},
+                "roles": {"type": "keyword"},
+            }},
+            # client.user.id was missing from Oracle in earlier bootstrap versions.
+            "client": {"properties": {
+                "user": {"properties": {
+                    "id":   {"type": "keyword"},
+                    "name": {"type": "keyword"},
+                }}
+            }},
+            # source was missing from Oracle entirely in earlier versions.
+            "source": {"properties": {
+                "ip": {"type": "ip"},
+                "geo": {"properties": {
+                    "country_iso_code": {"type": "keyword"},
+                    "city_name":        {"type": "keyword"},
+                    "region_name":      {"type": "keyword"},
+                    "location":         {"type": "geo_point"},
+                }},
+            }},
+        }
+    }
+
+    # Discover all backing indices for PingOne and Oracle data streams
+    target_streams = [
+        "logs-ping_one.audit-mortgage",
+        "logs-oracle.database_audit-mortgage",
+    ]
+
+    for stream in target_streams:
+        # GET the data stream to find its backing indices
+        status, resp = _request(
+            f"{host}/_data_stream/{stream}", "GET", None, auth, verify_ssl
+        )
+        if status != 200:
+            print(f"  ~ [{status}] {stream} not found — skipping")
+            continue
+
+        data_streams = resp.get("data_streams", [])
+        if not data_streams:
+            print(f"  ~ {stream}: no backing indices found")
+            continue
+
+        for ds in data_streams:
+            for backing in ds.get("indices", []):
+                index_name = backing.get("index_name", "")
+                if not index_name:
+                    continue
+                s, r = _request(
+                    f"{host}/{index_name}/_mapping",
+                    "PUT", shared_mapping, auth, verify_ssl
+                )
+                if s == 200:
+                    print(f"  ✓ [{s}] Patched: {index_name}")
+                else:
+                    reason = r.get("error", {}).get("reason", "")[:80]
+                    print(f"  ✗ [{s}] Failed:  {index_name}  {reason}")
+
+
 # ── DFA job definitions ────────────────────────────────────────────────────────
 
 def create_dfa_jobs(host, auth, verify_ssl):
-    print("\n▸ Creating DFA job definitions…")
-
-    # ── mortgage-audit-classification ───────────────────────────────────────
-    es_put(host, "/_ml/data_frame/analytics/mortgage-audit-classification", {
-        "description": "Binary classification — predicts audit.is_suspicious "
-                       "from behavioral and contextual signals in LendPath audit events",
-        "source": {
-            "index": ["logs-mortgage.audit-default"],
-            "query": {"match_all": {}}
-        },
-        "dest": {
-            "index":         "mortgage-audit-classification",
-            "results_field": "ml"
-        },
-        "analysis": {
-            "classification": {
-                "dependent_variable":              "audit.is_suspicious",
-                "training_percent":                80,
-                "num_top_classes":                 2,
-                "prediction_field_name":           "is_suspicious_prediction",
-                "num_top_feature_importance_values": 5,
-                "class_assignment_objective":      "maximize_minimum_recall",
-            }
-        },
-        "analyzed_fields": {
-            "includes": [
-                "audit.risk_score",
-                "audit.mfa_used",
-                "audit.off_hours",
-                "audit.new_device",
-                "audit.vpn_detected",
-                "event.action",
-                "user.roles",
-                "source.geo.country_iso_code",
-                "audit.is_suspicious",
-            ],
-            "excludes": [
-                "@timestamp",
-                "user.id",
-                "user.name",
-                "user.email",
-                "audit.session_id",
-            ]
-        },
-        "model_memory_limit":  "100mb",
-        "allow_lazy_start":    False,
-        "max_num_threads":     1,
-    }, auth, verify_ssl, "DFA job: mortgage-audit-classification")
-
-    # ── mortgage-privileged-access-classification ────────────────────────────
-    es_put(host, "/_ml/data_frame/analytics/mortgage-privileged-access-classification", {
-        "description": "Binary classification — predicts ping_one.audit.risk.level "
-                       "across PingOne IAM and Oracle database audit events",
-        "source": {
-            "index": [
-                "logs-ping_one.audit-mortgage",
-                "logs-oracle.database_audit-mortgage",
-            ],
-            "query": {"match_all": {}},
-            "runtime_mappings": {
-                "ping_one.audit.result.status": {"type": "keyword"},
-                "oracle.database_audit.action":    {"type": "keyword"},
-                "oracle.database_audit.privilege": {"type": "keyword"},
-                "ping_one.audit.risk.score":       {"type": "double"},
-                "ping_one.audit.risk.level":       {"type": "keyword"},
-                "ping_one.audit.action.type":      {"type": "keyword"},
-                "event.outcome":                   {"type": "keyword"},
-            }
-        },
-        "dest": {
-            "index":         "mortgage-privileged-access-classification",
-            "results_field": "ml"
-        },
-        "analysis": {
-            "classification": {
-                "dependent_variable":              "ping_one.audit.risk.level",
-                "training_percent":                80,
-                "num_top_classes":                 3,
-                "prediction_field_name":           "risk_level_prediction",
-                "num_top_feature_importance_values": 5,
-                "class_assignment_objective":      "maximize_minimum_recall",
-            }
-        },
-        "analyzed_fields": {
-            "includes": [
-                "ping_one.audit.risk.score",
-                "ping_one.audit.risk.level",
-                "ping_one.audit.action.type",
-                "ping_one.audit.result.status",
-                "oracle.database_audit.action",
-                "oracle.database_audit.privilege",
-                "event.outcome",
-            ],
-            "excludes": ["@timestamp", "user.id", "user.name"]
-        },
-        "model_memory_limit":  "150mb",
-        "allow_lazy_start":    False,
-        "max_num_threads":     1,
-    }, auth, verify_ssl, "DFA job: mortgage-privileged-access-classification")
+    print("\n▸ DFA jobs — intentionally not pre-created:")
+    print("  ℹ  mortgage-privileged-access-classification")
+    print("       → Created by student in Part 1 via Dev Tools (includes/excludes)")
+    print("  ℹ  mortgage-audit-classification")
+    print("       → Created by Elastic Workflow in Part 2 (automated)")
 
 
 # ── Kibana data views ──────────────────────────────────────────────────────────
@@ -544,6 +626,8 @@ Examples:
     save_config(args)
 
     create_templates(args.host, auth, verify_ssl)
+    create_data_streams(args.host, auth, verify_ssl)
+    patch_existing_mappings(args.host, auth, verify_ssl)
     create_dfa_jobs(args.host, auth, verify_ssl)
 
     if not args.skip_kibana:
@@ -552,17 +636,17 @@ Examples:
     print(f"\n{'='*56}")
     print(f"✓ Bootstrap complete.")
     print()
-    print(f"  DFA jobs created (not started):")
-    print(f"    • mortgage-audit-classification")
+    print(f"  DFA jobs — created by students, not bootstrap:")
     print(f"    • mortgage-privileged-access-classification")
+    print(f"       Part 1: create via Dev Tools with analyzed_fields includes/excludes")
+    print(f"    • mortgage-audit-classification")
+    print(f"       Part 2: Elastic Workflow creates this automatically")
     print()
     print(f"  Next steps:")
     print(f"    1. Generate data:")
     print(f"       python sdg-prime-classification.py \\")
     print(f"           --days 30 --events-per-day 2000 --anomaly-pct 15")
-    print(f"    2. Start DFA jobs in Kibana:")
-    print(f"       ML → Data Frame Analytics → ▶")
-    print(f"    3. Follow WORKSHOP_FOCUSED.md")
+    print(f"    2. Follow WORKSHOP_FOCUSED.md — Part 1 starts with Dev Tools job creation")
     print(f"{'='*56}\n")
 
 
