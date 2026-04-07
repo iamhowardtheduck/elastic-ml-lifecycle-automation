@@ -730,10 +730,17 @@ def backfill(host, user, password, verify_ssl,
     es = Elasticsearch(host, basic_auth=(user, password), **ssl_opts)
 
     today     = datetime.now(tz).date()
-    start_day = today - timedelta(days=days - 1)
+    yesterday = today - timedelta(days=1)
+    # Window runs from (today - days) through yesterday inclusive.
+    # Today is intentionally excluded — timestamps are distributed across the
+    # full day using diurnal weights, so a "today" entry would generate events
+    # spread into future hours that haven't happened yet, causing documents to
+    # appear to keep indexing after the generator has stopped.
+    # With --days 30 the window covers days 31 through 1 day ago (30 full days).
+    start_day = today - timedelta(days=days)
     tz_name   = tz_str(tz)
 
-    # Build schedule
+    # Build schedule — days full days ending yesterday
     schedule = []
     for d in range(days):
         day    = start_day + timedelta(days=d)
@@ -754,7 +761,7 @@ def backfill(host, user, password, verify_ssl,
     print(f"  Weekend/holiday:{round(epd * 0.15):,} events/day per stream")
     print(f"  Anomaly %:      {anomaly_pct}%")
     print(f"  Timezone:       {tz_name}")
-    print(f"  Window:         {start_day}  →  {today}")
+    print(f"  Window:         {start_day}  →  {yesterday}  (today excluded)")
     print(f"  ~Total docs:    {total_docs:,}")
     print(f"  CPU cores:      {_CPU_CORES}  →  workers={workers}, pb_threads={pb_threads}")
     print()
@@ -903,9 +910,10 @@ def backfill(host, user, password, verify_ssl,
           f"(~{round(sum(c for _,c in schedule)*anomaly_pct/100):,} docs)")
     print(f"{'='*70}")
 
-    # Return tuple so main() can pass all three values to live_generate
-    today_entry = next((c for d, c in schedule if d == today), 0)
-    return days, epd, today_entry
+    # today is not in the schedule (intentionally excluded from backfill).
+    # Return 0 for today_entry so live_generate generates the full day target
+    # for today from the current time onwards.
+    return days, epd, 0
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────
