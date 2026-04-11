@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 1 — Build and Train a Classification Job | LendPath ML Workshop</title>
+  <style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0c111b;
+    --bg2:       #111827;
+    --panel:     #161f2e;
+    --panel2:    #1a2540;
+    --border:    #1f2f48;
+    --border2:   #2a3f60;
+    --teal:      #00d4b4;
+    --teal-dim:  rgba(0,212,180,0.12);
+    --blue:      #4f9cf9;
+    --blue-dim:  rgba(79,156,249,0.1);
+    --amber:     #f59e0b;
+    --amber-dim: rgba(245,158,11,0.1);
+    --green:     #22c55e;
+    --green-dim: rgba(34,197,94,0.1);
+    --red:       #f87171;
+    --red-dim:   rgba(248,113,113,0.1);
+    --text:      #c8d8f0;
+    --text-dim:  #6b88aa;
+    --white:     #eef4ff;
+    --code-bg:   #090e18;
+    --code-text: #7dd3c8;
+    --ch0: #6b88aa;
+    --ch1: #4f9cf9;
+    --ch2: #22c55e;
+    --ch3: #f59e0b;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.75;
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Layout ── */
+  .page-wrap { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 24px 0 40px;
+  }
+
+  .sidebar-logo {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .sidebar-logo .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 4px;
+  }
+  .sidebar-logo .wname {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--white);
+    line-height: 1.3;
+  }
+
+  .sidebar-nav { padding: 0 12px; }
+  .sidebar-nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 12.5px;
+    color: var(--text-dim);
+    transition: all 0.15s;
+    margin-bottom: 2px;
+  }
+  .sidebar-nav a:hover { background: var(--panel); color: var(--text); }
+  .sidebar-nav a.active { background: var(--teal-dim); color: var(--teal); }
+  .sidebar-nav a .ch-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .toc-section { margin-top: 20px; padding: 0 20px 6px; }
+  .toc-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .toc-list { list-style: none; }
+  .toc-list li a {
+    display: block;
+    padding: 4px 0;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    padding-left: 10px;
+    transition: all 0.12s;
+    line-height: 1.4;
+  }
+  .toc-list li a:hover { color: var(--text); border-left-color: var(--border2); }
+
+  /* ── Main content ── */
+  .content {
+    flex: 1;
+    max-width: 860px;
+    padding: 48px 56px 80px;
+    min-width: 0;
+  }
+
+  /* ── Chapter header ── */
+  .chapter-header {
+    margin-bottom: 40px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid var(--border);
+  }
+  .chapter-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .chapter-eyebrow::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    max-width: 120px;
+  }
+  .chapter-title {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--white);
+    line-height: 1.2;
+    margin-bottom: 14px;
+    letter-spacing: -0.01em;
+  }
+  .chapter-desc {
+    font-size: 15px;
+    color: var(--text-dim);
+    line-height: 1.7;
+    max-width: 680px;
+  }
+  .chapter-desc em { font-style: italic; color: var(--text); }
+
+  /* ── Section headings ── */
+  .section {
+    margin-bottom: 48px;
+    padding-top: 8px;
+  }
+  h2.section-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--white);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  h2.section-title .step-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--bg);
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  h3.sub-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--white);
+    margin: 24px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h3.sub-title::before {
+    content: '';
+    width: 3px;
+    height: 16px;
+    background: var(--border2);
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  h4 { font-size: 13.5px; font-weight: 700; color: var(--text); margin: 18px 0 8px; }
+
+  p { margin-bottom: 14px; }
+  p:last-child { margin-bottom: 0; }
+
+  /* ── Code blocks ── */
+  .code-wrap {
+    position: relative;
+    margin: 16px 0;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--panel);
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .code-lang {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .copy-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--text-dim);
+    padding: 3px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.05em;
+  }
+  .copy-btn:hover { border-color: var(--teal); color: var(--teal); }
+  .copy-btn.copied { border-color: var(--green); color: var(--green); }
+  pre {
+    background: var(--code-bg);
+    padding: 16px 18px;
+    overflow-x: auto;
+    margin: 0;
+  }
+  pre code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--code-text);
+    white-space: pre;
+  }
+  code.inline {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: var(--panel2);
+    color: var(--blue);
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Callout boxes ── */
+  .callout {
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 18px 0;
+    border-left: 3px solid;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .callout-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .callout-body { flex: 1; min-width: 0; }
+  .callout-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .callout.important {
+    background: var(--amber-dim);
+    border-color: var(--amber);
+  }
+  .callout.important .callout-title { color: var(--amber); }
+  .callout.info {
+    background: var(--blue-dim);
+    border-color: var(--blue);
+  }
+  .callout.info .callout-title { color: var(--blue); }
+  .callout.tip {
+    background: var(--teal-dim);
+    border-color: var(--teal);
+  }
+  .callout.tip .callout-title { color: var(--teal); }
+  .callout.warn {
+    background: var(--red-dim);
+    border-color: var(--red);
+  }
+  .callout.warn .callout-title { color: var(--red); }
+
+  /* ── Screenshots ── */
+  .screenshot-wrap {
+    margin: 18px 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--panel);
+  }
+  .screenshot-wrap img {
+    width: 100%;
+    display: block;
+  }
+  .screenshot-wrap .caption {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    padding: 6px 12px;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    text-align: center;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Tables ── */
+  .table-wrap { margin: 18px 0; overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  thead tr { background: var(--panel2); border-bottom: 2px solid var(--border2); }
+  th {
+    padding: 10px 14px;
+    text-align: left;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.55;
+  }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+  /* ── Details / discussion ── */
+  details {
+    margin: 18px 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  summary {
+    padding: 14px 18px;
+    background: var(--panel);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--teal);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before {
+    content: '▶';
+    font-size: 10px;
+    transition: transform 0.2s;
+  }
+  details[open] summary::before { transform: rotate(90deg); }
+  details[open] summary { background: var(--panel2); border-bottom: 1px solid var(--border); }
+  .details-body {
+    padding: 20px 22px;
+    background: var(--bg2);
+  }
+  .details-body h2 { font-size: 15px; font-weight: 700; color: var(--white); margin: 20px 0 10px; }
+  .details-body h2:first-child { margin-top: 0; }
+  .details-body p { font-size: 14px; line-height: 1.75; margin-bottom: 14px; }
+
+  /* ── Blockquotes / notes ── */
+  blockquote {
+    border-left: 3px solid var(--border2);
+    padding: 12px 18px;
+    margin: 18px 0;
+    background: var(--panel);
+    border-radius: 0 6px 6px 0;
+    font-size: 14px;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+  blockquote strong { color: var(--text); font-style: normal; }
+  blockquote em { color: var(--text); }
+
+  /* ── Lists ── */
+  ul, ol { padding-left: 22px; margin: 10px 0 14px; }
+  li { margin-bottom: 6px; line-height: 1.6; }
+  li code.inline { font-size: 11.5px; }
+
+  /* ── Nav footer ── */
+  .chapter-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 60px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    gap: 16px;
+  }
+  .nav-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.15s;
+  }
+  .nav-btn:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-dim); }
+  .nav-btn .arrow { font-size: 16px; }
+  .nav-btn.next { flex-direction: row-reverse; }
+  .nav-center {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  /* ── Instruqt button ── */
+  .instruqt-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--teal-dim);
+    border: 1px solid var(--teal);
+    border-radius: 6px;
+    color: var(--teal);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: default;
+    margin: 8px 0;
+  }
+  .instruqt-btn::before { content: '▶'; font-size: 10px; }
+
+  /* ── Provide fields ── */
+  .provide-item {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 8px 14px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin: 8px 0;
+  }
+  .provide-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-dim);
+    white-space: nowrap;
+    min-width: 120px;
+  }
+
+  /* ── HR ── */
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+  /* ── Objective box ── */
+  .objective-box {
+    background: var(--blue-dim);
+    border: 1px solid rgba(79,156,249,0.2);
+    border-left: 3px solid var(--blue);
+    border-radius: 0 8px 8px 0;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+  }
+  .objective-box .obj-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--blue);
+    margin-bottom: 6px;
+  }
+  .objective-box p { font-size: 14px; color: var(--text); margin: 0; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg2); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  @media print {
+    .sidebar { display: none; }
+    .content { padding: 32px; }
+  }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="eyebrow">Elastic ML Workshop</div><div class="wname">LendPath Classification</div></div>
+<div class="sidebar-nav">
+<a href="instruqt-chapter-0-setup.html"><span class="ch-dot" style="background:var(--ch0)"></span>Ch 0 — Setup &amp; Environment Review</a>
+<a href="instruqt-chapter-1-classification.html" class="active"><span class="ch-dot" style="background:var(--ch1)"></span>Ch 1 — Build and Train a Classificati</a>
+<a href="instruqt-chapter-2-agent-workflow.html"><span class="ch-dot" style="background:var(--ch2)"></span>Ch 2 — AI Agent Analysis and Workflow</a>
+<a href="instruqt-chapter-3-final-thoughts.html"><span class="ch-dot" style="background:var(--ch3)"></span>Ch 3 — Final Thoughts &amp; Take-Aways</a>
+</div>
+
+  </aside>
+
+  <div class="content">
+    <div class="chapter-header">
+      <div class="chapter-eyebrow" style="color:var(--ch1)">
+        Chapter 1
+      </div>
+      <div class="chapter-title">Build and Train a Classification Job</div>
+      <div class="chapter-desc"><strong>Objective:</strong> Create, train, and deploy the <code class="inline">mortgage-privileged-access-classification</code> Data Frame Analytics job from scratch — exploring the Kibana wizard, recreating the job via Dev Tools to add excludes and hyperparameters, evaluating results, and wiring an inference pipeline so every new event is scored in real time. <strong>Objective:</strong> Create a multi-class Data Frame Analytics classification job from scratch</div>
+    </div>
+
+    <div class="objective-box"><div class="obj-label">Objective</div><p>Create, train, and deploy the <code class="inline">mortgage-privileged-access-classification</code> Data Frame Analytics job from scratch — exploring the Kibana wizard, recreating the job via Dev Tools to add excludes and hyperparameters, evaluating results, and wiring an inference pipeline so every new event is scored in real time.</p></div>
+<p><strong>Objective:</strong> Create a multi-class Data Frame Analytics classification job from scratch using the Kibana UI. Configure it to predict whether a privileged access event is <code class="inline">LOW</code>, <code class="inline">MEDIUM</code>, or <code class="inline">HIGH</code> risk by learning from two data sources simultaneously — PingOne IAM audit events and Oracle database audit events.</p>
+<p>By the end of Part 1 you will have:</p>
+<ul>
+  <li>A trained classification model ready for deployment</li>
+  <li>Understood how DFA handles cross-source datasets with null fields</li>
+  <li>Deployed the model as an ingest pipeline scoring new events in real time</li>
+  <li>Seen live predictions appear in Discover</li>
+</ul>
+<hr>
+<h2 class="section-title" id="1-1-explore-the-source-data"><span class="step-num" style="background:var(--ch1)">1.1</span> Explore the Source Data</h2>
+<hr>
+<p>Before building the job, understand what you are training on.</p>
+<p>Set your time-picker to 30 days ago:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/e2570bc213c5efd5eab8918cb711b710/assets/Apr-06-2026_at_16.07.42-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.07.42</div></div>
+<p>Our data generator automatically filled in peeks for standard work hours and weekends:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/0f2e99dcaa8b4e05ef32673c4576fd30/assets/Apr-06-2026_at_16.08.29-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.08.29</div></div>
+<h3 class="sub-title" id="pingone-audit-data">PingOne audit data</h3>
+<p>Select the <code class="inline">logs-ping_one.audit-mortgage</code> data view.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/6c583d933afb5845ebcdc234abc7f57b/assets/Apr-06-2026_at_16.11.03-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.11.03</div></div>
+<p>Add these columns:</p>
+<ul>
+  <li><code class="inline">ping_one.audit.risk.level</code> — this is the <strong>label</strong> the model will learn to predict</li>
+  <li><code class="inline">ping_one.audit.risk.score</code> — numeric risk signal 0–100</li>
+  <li><code class="inline">ping_one.audit.action.type</code> — IAM action category</li>
+  <li><code class="inline">ping_one.audit.result.status</code> — SUCCESS, FAILED, BLOCKED, REQUIRES_MFA</li>
+  <li><code class="inline">event.outcome</code> — success or failure</li>
+</ul>
+<p>Look at a few documents. Notice that <code class="inline">LOW</code> risk events dominate, <code class="inline">HIGH</code> risk events are rarer, and <code class="inline">MEDIUM</code> sits between them. This is the class distribution the model will learn from.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/7bd5f86204a470e20f188439287c10a1/assets/Apr-06-2026_at_16.12.13-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.12.13</div></div>
+<h3 class="sub-title" id="oracle-audit-data">Oracle audit data</h3>
+<p>Switch to the <code class="inline">logs-oracle.database_audit-mortgage</code> data view.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/dd5b9ef930d7abfc3fc326a929460068/assets/Apr-06-2026_at_16.12.50-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.12.50</div></div>
+<p>Add these columns:</p>
+<ul>
+  <li><code class="inline">oracle.database_audit.action</code> — SQL action: SELECT, DROP TABLE, GRANT, EXPORT, etc.</li>
+  <li><code class="inline">oracle.database_audit.privilege</code> — SYSDBA, DBA, CREATE SESSION, NOT APPLICABLE</li>
+  <li><code class="inline">event.outcome</code> — success or failure</li>
+</ul>
+<p>Notice these documents have <strong>no PingOne fields</strong> — <code class="inline">ping_one.audit.risk.level</code> is absent. The model will be trained on this mixed dataset. When an Oracle document is scored it will have null PingOne features, and when a PingOne document is scored it will have null Oracle features. DFA handles this naturally — missing fields are treated as absent features, not errors.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/61d98299f06e510d248c13998f57a97b/assets/Apr-06-2026_at_16.14.00-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.14.00</div></div>
+<p><strong>Discussion:</strong> Why would you want to train a single model on both sources rather than two separate models? What does it gain you to know that a <code class="inline">SYSDBA</code> privilege escalation event from Oracle carries the same risk signature as a <code class="inline">USER.MFA.BYPASS</code> from PingOne?</p>
+<details><summary>💬 Answers</summary><div class="details-body"><h2>Why train one model on both sources rather than two separate models?</h2>
+<p>The core reason is that the threat you're trying to detect - (a privileged access risk event) - doesn't respect system boundaries. An attacker compromising the mortgage platform doesn't announce themselves in just one log source. The pattern that actually signals a high-risk session is often a sequence across systems: a PingOne authentication succeeds (possibly bypassing MFA), followed shortly by an Oracle SYSDBA session from the same user doing destructive or exfiltration actions. If you train two separate models, each one only sees half the picture and can only tell you "this individual event looks a bit unusual." Neither can learn that the combination of signals across both sources is what elevates the risk. A single cross-source model sees the full feature space for each document, even when most features from the other source are null. It learns that the presence of oracle.database_audit.privilege = SYSDBA combined with event.outcome = success carries predictive weight regardless of whether the PingOne fields are present — because those combinations showed up near risk.level = HIGH in training. The model essentially becomes a unified risk scoring function for privileged access activity across your IAM and database layers, rather than two siloed detectors that have to be manually correlated after the fact. There's also a practical data volume argument. HIGH-risk events are rare by design - that's what makes them anomalous. If you split your already-imbalanced dataset across two models, each model sees even fewer positive-class examples, making it harder to learn reliable decision boundaries for the rare cases you actually care about.</p>
+<h2>What does it gain you to know that SYSDBA privilege escalation and USER.MFA.BYPASS carry the same risk signature?</h2>
+<p>It gives you normalization across heterogeneous systems - a single unified risk score that means the same thing regardless of where the event originated. Without this, a security analyst has to mentally translate between "PingOne severity 8" and "Oracle privilege level SYSDBA" and decide whether those are equivalent. The model has already done that translation during training, anchored to the ground truth of what events were actually labeled HIGH risk. More practically, it means your inference pipeline produces ml.risk_level_prediction = HIGH on events from either source, and a dashboard or alert rule can treat them identically. You can build a single Discover filter, a single alert threshold, a single case creation rule. The downstream operations don't need to know whether the event came from PingOne or Oracle — the model has abstracted that away into a common risk language. It also gives you better generalization. If a novel attack pattern appears in Oracle that the Oracle-only features wouldn't recognise as risky, but it shares feature combinations with MFA bypass patterns the model learned from PingOne data, the cross-trained model has a better chance of catching it. The feature space is richer, the decision boundary is informed by more signal, and the model is harder to evade by staying within one system's "normal" range.</p>
+</div></details>
+<hr>
+<h2 class="section-title" id="1-2-check-class-balance"><span class="step-num" style="background:var(--ch1)">1.2</span> Check Class Balance</h2>
+<hr>
+<p>Before creating the job, verify you have enough of each class to train on.</p>
+<p>Run this ES|QL query:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/52062565b412c41e1a04919e825fffb3/assets/Apr-06-2026_at_16.15.18-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.15.18</div></div>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>FROM logs-ping_one.audit-mortgage
+| WHERE @timestamp &gt; NOW() - 30 days
+| STATS doc_count = COUNT(*)
+        BY ping_one.audit.risk.level
+| SORT doc_count DESC</code></pre></div>
+<p>This groups all PingOne documents by their <code class="inline">risk.level</code> value and returns the count for each. You should see three rows — <code class="inline">LOW</code>, <code class="inline">MEDIUM</code>, and <code class="inline">HIGH</code> — with <code class="inline">LOW</code> dominating and <code class="inline">HIGH</code> being the rarest class.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/d448d3e13911dbbed7f8f70a63048655/assets/Apr-06-2026_at_16.17.29-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.17.29</div></div>
+<p>You need at least several hundred documents in each class for the model to learn reliably. If <code class="inline">HIGH</code> is very sparse, the <code class="inline">maximize_minimum_recall</code> objective you will set in the next step specifically addresses this by penalising the model for missing rare classes.</p>
+<blockquote><strong>ES|QL conditional counting : <code class="inline">COUNT</code> vs <code class="inline">SUM(CASE(...))</code></strong>
+
+<code class="inline">COUNT(<em>)</code> counts all rows. <code class="inline">COUNT(field)</code> counts rows where that field is
+non-null - it does <strong>not</strong> filter on a condition. If you were to use <code class="inline">COUNT(audit.risk_score &gt; 75)</code>
+then this returns the same value as <code class="inline">COUNT(</em>)</code> because the boolean expression evaluates
+to <code class="inline">true</code> or <code class="inline">false</code>, both non-null, so every row is counted.
+
+<code class="inline">The </code>SUM(CASE(condition, 1, 0))` - scores each row 1 if the
+condition is true and 0 otherwise, and sums the result. The queries in this
+workshop all use <code class="inline">SUM(CASE(...))</code> for this reason.</blockquote>
+<p>Also verify the Oracle source has data, so please run this ES|QL query::</p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>FROM logs-oracle.database_audit-mortgage
+| WHERE @timestamp &gt; NOW() - 30 days
+| STATS total        = COUNT(*),
+        sysdba_count = SUM(CASE(oracle.database_audit.privilege == "SYSDBA", 1, 0)),
+        dba_count    = SUM(CASE(oracle.database_audit.privilege == "DBA", 1, 0)),
+        drop_count   = SUM(CASE(oracle.database_audit.action == "DROP TABLE", 1, 0))</code></pre></div>
+<p>Oracle documents don't carry <code class="inline">ping_one.audit.risk.level</code> — they will have null for that field. The model will train on both sources simultaneously and learn to predict risk level from the Oracle features (<code class="inline">action</code>, <code class="inline">privilege</code>, <code class="inline">event.outcome</code>) when the PingOne risk score is absent.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/2706ab31b8134d8931d172ad94449864/assets/Apr-06-2026_at_16.19.57-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.19.57</div></div>
+<hr>
+<h2 class="section-title" id="1-3-create-the-dfa-job"><span class="step-num" style="background:var(--ch1)">1.3</span> Create the DFA Job</h2>
+<hr>
+<p>The Kibana DFA wizard is a good starting point for configuration, but it does not expose the <code class="inline">analyzed_fields</code> excludes list — you can only select fields to include, not fields to explicitly exclude. For this job, excluding <code class="inline">@timestamp</code>, <code class="inline">user.id</code>, and <code class="inline">user.name</code> is essential: without it DFA will include every mapped field and the model will overfit to individual users and timestamps rather than learning behavioral patterns.</p>
+<p>The approach is therefore split: use the Kibana UI to configure everything it supports well, then use Dev Tools to create the job with the full <code class="inline">analyzed_fields</code> specification.</p>
+<hr>
+<h3 class="sub-title" id="part-a-explore-the-wizard">Part A — Explore the wizard 🧙‍♂️</h3>
+<p>Navigate to <strong>Data Frame Analytics</strong> by searching for it in the top search bar:</p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>data frame analytics</code></pre></div>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/c7630983e18d983984bf7f3fe92dbb7e/assets/Apr-06-2026_at_16.21.45-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.21.45</div></div>
+<p>Now click on <code class="inline">Create Data Frame Analytics Job</code>:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/5e03b0d90aaafe172dbb59e086df3a5f/assets/Apr-06-2026_at_16.23.55-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.23.55</div></div>
+<p>Walk through the wizard to understand the available options — this is valuable for understanding what DFA exposes before you create the job via API. You do not need to complete or submit the wizard.</p>
+<p><strong>Step 1 — Types:</strong> Select <strong>Data view</strong>.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/0bd8ab42a33f6d66f532d3b701b70977/assets/Apr-06-2026_at_16.26.09-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.26.09</div></div>
+<p>Since we want to create a data frame analytics job which will span multiple data views, we will need to create it; press <code class="inline">Create a data view</code>:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/6057cfcf1bc6332da4916c04c79488ac/assets/Apr-06-2026_at_16.27.50-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.27.50</div></div>
+<p>Provide the following:</p>
+<ul>
+  <li><strong>Name</strong>: <pre><code>logs-mortgage-privileged-access-classification</code></pre></li>
+  <li><strong>Index pattern</strong>: <pre><code>logs-ping_one.audit-mortgage<em>,logs-oracle.database_audit-mortgage</em></code></pre></li>
+  <li><strong>Timestamp field</strong>: <em>leave the default</em></li>
+  <li><em>Click on <strong>Show advanced settings</strong></em></li>
+  <li><strong>Custom data view ID</strong>: <pre><code>logs-mortgage-privileged-access-classification</code></pre></li>
+</ul>
+<p>Press the <code class="inline">Save data view to Kibana</code>:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/c1a47b39034cf9aac9bc74d9f5c7f32f/assets/Apr-06-2026_at_16.31.56-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.31.56</div></div>
+<p><strong>Step 2 — Job type:</strong> Select <strong>Classification</strong>:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/8fa00445b80c693b837ae2e7a660d929/assets/Apr-06-2026_at_16.32.33-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.32.33</div></div>
+<p><strong>Step 3 — Configuration:</strong> Note that <strong>Dependent variable</strong> shows a dropdown of keyword and boolean fields. <code class="inline">ping_one.audit.risk.level</code> should appear here — this is the field the model will learn to predict.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/293177d0da5267090af391b413cf1234/assets/Apr-06-2026_at_16.33.48-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.33.48</div></div>
+<p>Scroll past the scatter plot and then press the <code class="inline">Continue</code> button:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/ba4eb54056fe2a2f281e854d577ca3b6/assets/Apr-06-2026_at_16.35.25-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.35.25</div></div>
+<p><strong>Step 4 — Additional options:</strong> Scroll through and expand the <code class="inline">&gt; Hyperparameters</code> to see Number of top classes, Training percent, Class assignment objective, Prediction field name, and Feature importance. These all map directly to the API parameters you will use in Part B.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/99dec5b4f08da61f97e484dc7db74bbd/assets/Apr-06-2026_at_16.38.54-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.38.54</div></div>
+<p><strong>Step 5 — Analyzed fields:</strong> Click <strong>Edit</strong> from <strong>Step 1</strong>.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/052be6d41e8db72c6ce47f8797a02ff8/assets/Apr-06-2026_at_16.40.21-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.40.21</div></div>
+<p>Expand the rows per page to <strong><em>50</strong></em>:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/7f6d15d5ceea9786ee1c81dfb4377ae6/assets/Apr-06-2026_at_16.42.10-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.42.10</div></div>
+<p>This screen shows a checkbox list of available fields with an <strong>Includes</strong> picker. Notice there is no <strong>Excludes</strong> field — this is the limitation. The UI can only control what is explicitly included; it cannot declare fields that should be excluded from an otherwise broad include. Cancel out of the wizard without creating the job.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/279c1a0bd0a42b90c3bc11a7f7fa3378/assets/Apr-06-2026_at_16.43.45-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.43.45</div></div>
+<blockquote><em>Why does this matter?</em> If you created the job from the UI using only the includes
+list, DFA would still ingest fields like <code class="inline">@timestamp</code>, <code class="inline">user.id</code>, <code class="inline">user.name</code>, and
+<code class="inline">audit.session_id</code> into the destination index. It would not analyze them — because
+they are not in the includes list — but their presence inflates memory usage and
+destination index size. More importantly, the <code class="inline">excludes</code> directive is the correct
+way to tell DFA "these fields exist in the source but should never be carried into
+the analysis at all," which keeps the dest index clean and the feature space tight.</blockquote>
+<p><strong>Step 6  — Create the DFA Classification Job:</strong></p>
+<p>Press <code class="inline">Continue</code> until you are on <code class="inline">Step 3 - Job Details</code></p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/f17edc991f5449b437e57c8bec90107c/assets/Apr-06-2026_at_16.51.10-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.51.10</div></div>
+<h2 class="section-title" id="provide-the-following-values">Provide the following values</h2>
+<p><strong>Job ID</strong></p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>mortgage-privileged-access-classification</code></pre></div>
+<p><strong>Description</strong></p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>Multi-class classification predicting privileged access risk level across PingOne IAM and Oracle DB audit events</code></pre></div>
+<p>The Data view for the DFA job is preconfigured, so please disable this toggle switch, then press <code class="inline">Continue</code>:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/7f497c119fbe300cf67283e67a007f89/assets/Apr-06-2026_at_16.54.30-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.54.30</div></div>
+<p><em>The Validation step will list a warning of empty values, this is ok as we will configure the rest with DevTools. Press <code class="inline">Continue</code></em></p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/7aaa887bffddf51ce9ebab51622301cf/assets/Apr-06-2026_at_16.55.38-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.55.38</div></div>
+<p>>## <strong>IMPORTANT!!!</strong> > ><strong>DISABLE THE <code class="inline">Start immediately</code> BEFORE PRESSING CREATE</strong> >!<a href="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/da33d59a44f0736328862fcc4476a13a/assets/Apr-06-2026_at_16.58.29-image.png" target="_blank">Apr-06-2026_at_16.58.29-image.png</a></p>
+<hr>
+<h3 class="sub-title" id="part-b-retrieve-the-ui-configuration-from-the-api">Part B — Retrieve the UI configuration from the API 🧲</h3>
+<p>Before writing the final <code class="inline">PUT</code>, use Dev Tools to retrieve the job definition the wizard would have created. This shows you the exact JSON structure that Kibana generated from your wizard selections in Part A — source indices, dependent variable, analyzed fields, and configuration — so you can extend it rather than write it from scratch.</p>
+<p>Search for and select the top result for <strong>Dev Tools</strong> and run:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/52351240173a123035c296ff22567498/assets/Apr-06-2026_at_17.01.10-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 17.01.10</div></div>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>GET /_ml/data_frame/analytics/mortgage-privileged-access-classification</code></pre></div>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/083066f9e897f7d78819b693df75eb5d/assets/Apr-06-2026_at_17.01.39-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 17.01.39</div></div>
+<p>If you did not save the job from the wizard this will return a 404, which is expected. If you did save it, the response body is your starting point. It will look similar to this (the <code class="inline">analyzed_fields.includes</code> list will reflect whatever the wizard selected):</p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">JSON</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>{
+  "count": 1,
+  "data_frame_analytics": [
+    {
+      "id": "mortgage-privileged-access-classification",
+      "create_time": 1775568315158,
+      "version": "12.0.0",
+      "authorization": {
+        "roles": [
+          "superuser"
+        ]
+      },
+      "description": "Multi-class classification predicting privileged access risk level across PingOne IAM and Oracle DB audit events",
+      "source": {
+        "index": [
+          "logs-ping_one.audit-mortgage*",
+          "logs-oracle.database_audit-mortgage*"
+        ],
+        "query": {
+          "match_all": {}
+        }
+      },
+      "dest": {
+        "index": "mortgage-privileged-access-classification",
+        "results_field": "ml"
+      },
+      "analysis": {
+        "classification": {
+          "dependent_variable": "ping_one.audit.risk.level",
+          "num_top_feature_importance_values": 0,
+          "class_assignment_objective": "maximize_minimum_recall",
+          "num_top_classes": -1,
+          "prediction_field_name": "ping_one.audit.risk.level_prediction",
+          "training_percent": 80,
+          "randomize_seed": -7454485974122494000,
+          "early_stopping_enabled": true
+        }
+      },
+      "analyzed_fields": {
+        "includes": [
+          "client.user.id",
+          "client.user.name",
+          "ecs.version",
+          "event.action",
+          "event.category",
+          "event.dataset",
+          "event.kind",
+          "event.outcome",
+          "event.type",
+          "host.name",
+          "input.type",
+          "oracle.database_audit.action",
+          "oracle.database_audit.action_number",
+          "oracle.database_audit.database.user",
+          "oracle.database_audit.entry.id",
+          "oracle.database_audit.length",
+          "oracle.database_audit.obj.name",
+          "oracle.database_audit.obj.schema",
+          "oracle.database_audit.privilege",
+          "oracle.database_audit.result_code",
+          "oracle.database_audit.session_id",
+          "oracle.database_audit.status",
+          "oracle.database_audit.terminal",
+          "ping_one.audit.action.type",
+          "ping_one.audit.actors.client.type",
+          "ping_one.audit.actors.user.type",
+          "ping_one.audit.result.description",
+          "ping_one.audit.result.status",
+          "ping_one.audit.risk.level",
+          "ping_one.audit.risk.score",
+          "process.pid",
+          "related.hosts",
+          "server.address",
+          "server.domain",
+          "source.geo.city_name",
+          "source.geo.country_iso_code",
+          "source.geo.region_name",
+          "source.ip",
+          "tags",
+          "user.email",
+          "user.id",
+          "user.name",
+          "user.roles"
+        ],
+        "excludes": []
+      },
+      "model_memory_limit": "187mb",
+      "allow_lazy_start": false,
+      "max_num_threads": 1
+    }
+  ]
+}</code></pre></div>
+<p>Notice two things the wizard did not let you set: <code class="inline">analyzed_fields.excludes</code> is an empty array, and the hyperparameter fields (<code class="inline">lambda</code>, <code class="inline">gamma</code>, <code class="inline">eta</code>, <code class="inline">feature_bag_fraction</code>) are absent from the <code class="inline">classification</code> block entirely.</p>
+<p>If you saved the job from the wizard, delete it now so you can recreate it correctly:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/caeadb399e32e91720378dbf47c23036/assets/Apr-06-2026_at_17.03.01-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 17.03.01</div></div>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>DELETE /_ml/data_frame/analytics/mortgage-privileged-access-classification</code></pre></div>
+<hr>
+<h3 class="sub-title" id="part-b-continued-recreate-with-excludes-and-hyperparameters">Part B (continued) — Recreate with excludes and hyperparameters</h3>
+<p>The complete <code class="inline">PUT</code> below is the updated and correct DFA job.</p>
+<p>The three changes from what the wizard produced are highlighted in the comments:</p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>PUT /_ml/data_frame/analytics/mortgage-privileged-access-classification
+{
+  "description": "Multi-class classification predicting privileged access risk level across PingOne IAM and Oracle DB audit events",
+  "source": {
+    "index": [
+      "logs-ping_one.audit-mortgage",
+      "logs-oracle.database_audit-mortgage"
+    ],
+    "query": { "match_all": {} }
+  },
+  "dest": {
+    "index":         "mortgage-privileged-access-classification",
+    "results_field": "ml"
+  },
+  "analysis": {
+    "classification": {
+      "dependent_variable":                "ping_one.audit.risk.level",
+      "training_percent":                  80,
+      "num_top_classes":                   3,
+      "prediction_field_name":             "risk_level_prediction",
+      "num_top_feature_importance_values": 5,
+      "class_assignment_objective":        "maximize_minimum_recall",
+      "lambda":               0.1,
+      "gamma":                0.1,
+      "eta":                  0.1,
+      "feature_bag_fraction": 0.5
+    }
+  },
+  "analyzed_fields": {
+    "includes": [
+      "ping_one.audit.risk.score",
+      "ping_one.audit.risk.level",
+      "ping_one.audit.action.type",
+      "ping_one.audit.result.status",
+      "oracle.database_audit.action",
+      "oracle.database_audit.privilege",
+      "event.outcome"
+    ],
+    "excludes": [
+      "@timestamp",
+      "user.id",
+      "user.name"
+    ]
+  },
+  "model_memory_limit": "550mb",
+  "allow_lazy_start":   false,
+  "max_num_threads":    1
+}</code></pre></div>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/b4f0c7ffcc01981f086586ce44c42562/assets/Apr-06-2026_at_17.05.21-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 17.05.21</div></div>
+<p>A <code class="inline">200</code> response with <code class="inline">"acknowledged": true</code> confirms the job was created in stopped state.</p>
+<p><strong>The three additions from what the wizard produced:</strong></p>
+<p><code class="inline">lambda</code>, <code class="inline">gamma</code>, <code class="inline">eta</code>, <code class="inline">featurebagfraction</code> — added as direct fields inside <code class="inline">analysis.classification</code>. These are the four hyperparameters you set manually. The API parser rejects a nested <code class="inline">"hyperparameters": {}</code> object as an unknown field; they must be flat siblings of <code class="inline">dependent_variable</code>.</p>
+<p><code class="inline">analyzedfields.excludes</code> — populated with <code class="inline">@timestamp</code>, <code class="inline">user.id</code>, and <code class="inline">user.name</code>. The wizard left this as an empty array. Adding these here tells DFA to strip them from the analysis entirely, keeping the feature space clean and preventing the model from learning time-based or identity-based patterns.</p>
+<p><strong>Why these specific includes and excludes:</strong></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Field</th><th>Role</th><th>Why</th></tr></thead>
+<tbody><tr><td><code class="inline">ping_one.audit.risk.score</code></td><td>Feature</td><td>Numeric 0–100 IAM risk signal — strongest single predictor</td></tr><tr><td><code class="inline">ping_one.audit.risk.level</code></td><td><strong>Dependent variable</strong></td><td>The label the model learns to predict: LOW / MEDIUM / HIGH</td></tr><tr><td><code class="inline">ping_one.audit.action.type</code></td><td>Feature</td><td>IAM action category — AUTHENTICATION, MFA, ADMIN</td></tr><tr><td><code class="inline">ping_one.audit.result.status</code></td><td>Feature</td><td>SUCCESS, FAILED, BLOCKED — strong failure signal</td></tr><tr><td><code class="inline">oracle.database_audit.action</code></td><td>Feature</td><td>SQL action — DROP TABLE, GRANT, SELECT</td></tr><tr><td><code class="inline">oracle.database_audit.privilege</code></td><td>Feature</td><td>SYSDBA, DBA, NOT APPLICABLE — privilege level</td></tr><tr><td><code class="inline">event.outcome</code></td><td>Feature</td><td>Cross-source success/failure signal present in both sources</td></tr><tr><td><code class="inline">@timestamp</code></td><td><strong>Excluded</strong></td><td>Time must never be a feature — the model would learn when events occur rather than what makes them risky</td></tr><tr><td><code class="inline">user.id</code></td><td><strong>Excluded</strong></td><td>Individual identity must never be a feature — the model would memorize specific users rather than behavioral patterns</td></tr><tr><td><code class="inline">user.name</code></td><td><strong>Excluded</strong></td><td>Same reason as <code class="inline">user.id</code></td></tr></tbody></table></div>
+<p><strong>Verify the job was created correctly:</strong></p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>GET /_ml/data_frame/analytics/mortgage-privileged-access-classification</code></pre></div>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/b9272c372b948d7d85e83f3981160cca/assets/Apr-06-2026_at_17.06.50-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 17.06.50</div></div>
+<p>Confirm <code class="inline">analyzed_fields.excludes</code> contains all three excluded fields and the four hyperparameter values appear inside <code class="inline">analysis.classification</code>.</p>
+<hr>
+<h2 class="section-title" id="1-4-start-the-job-and-monitor-training"><span class="step-num" style="background:var(--ch1)">1.4</span> Start the Job and Monitor Training</h2>
+<hr>
+<p>Search for and select the top result for <pre><code>data frame analytics jobs</code></pre></p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/c910082e52721e59f99481617a8e8a87/assets/Apr-06-2026_at_17.08.12-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 17.08.12</div></div>
+<p>Click <strong>▶ Start</strong> on the <code class="inline">mortgage-privileged-access-classification</code> row.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/cc375b96bd499da35732c376596c300c/assets/Apr-06-2026_at_17.09.12-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 17.09.12</div></div>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/7510a47498f2d3d3b4c383e9808de7b6/assets/Apr-06-2026_at_17.09.40-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 17.09.40</div></div>
+<p>The job moves through eight phases,  press <code class="inline">Refresh</code> to observe the progress:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Phase</th><th>What happens</th></tr></thead>
+<tbody><tr><td><code class="inline">reindexing</code></td><td>All documents from both source indices are copied to the destination index</td></tr><tr><td><code class="inline">loading_data</code></td><td>Features are extracted and prepared for the boosted tree algorithm</td></tr><tr><td><code class="inline">feature_selection</code></td><td>Fields with zero variance or no statistical correlation to the dependent variable are identified and dropped before training begins</td></tr><tr><td><code class="inline">coarse_parameter_search</code></td><td>A Bayesian search sweeps the hyperparameter space to find rough starting values for any parameters left unset ~ the slowest phase</td></tr><tr><td><code class="inline">fine_tuning_parameters</code></td><td>The coarse candidates are narrowed to final values for each auto-tuned hyperparameter</td></tr><tr><td><code class="inline">final_training</code></td><td>Predictions and feature importance scores are written back to the destination index for every document in the held-out test set</td></tr><tr><td><code class="inline">writing_results</code></td><td>The trained model writes predictions to the remaining 20% of documents</td></tr><tr><td><code class="inline">inference</code></td><td>The model is evaluated against the test set and accuracy metrics (precision, recall, and the confusion matrix) are computed and stored</td></tr></tbody></table></div>
+<p>Training typically takes 3–8 minutes depending on document count and cluster size. Watch the progress bar in <strong>Data Frame Analytics → Jobs</strong>.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/ac0f1abff4443873d39adf1b230532b2/assets/Apr-06-2026_at_17.10.35-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 17.10.35</div></div>
+<p>While it trains...</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/6a38aa8d35651af7d88d730ce50aa16a/assets/Apr-06-2026_at_17.11.34-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 17.11.34</div></div>
+<blockquote><em>DFA is training on a dataset where roughly half the documents have null PingOne
+fields and half have null Oracle fields. The model is learning that certain
+combinations — SYSDBA privilege with a failed outcome, or USER.MFA.BYPASS from
+PingOne — are both indicative of HIGH risk, even though they come from completely
+different systems. This cross-source pattern recognition is something a rule-based
+system could not do.</em></blockquote>
+<hr>
+<h2 class="section-title" id="1-5-explore-the-training-results"><span class="step-num" style="background:var(--ch1)">1.5</span> Explore the Training Results</h2>
+<hr>
+<h3 class="sub-title" id="synchronize-jobs-trained-models">Synchronize jobs &amp; trained models</h3>
+<p>After the model is completed, you will need to synchronize it with your cluster; click the <code class="inline">Synchronize your jobs and trained models.</code> link:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/11fe0d207f482607ece27fd77cfa5fb4/assets/Apr-07-2026_at_09.33.46-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-07-2026 at 09.33.46</div></div>
+<p>Press the <code class="inline">Synchronize</code> button then <code class="inline">Close</code>:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/0c3e6661f5a1df15efc9d2f6073978e1/assets/Apr-07-2026_at_09.36.07-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-07-2026 at 09.36.07</div></div>
+<p>Once the job reaches 100% and status shows <strong>Stopped (completed)</strong>, click <strong>Explore results</strong>.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/17ccc521c4e09795e7b4737f13423121/assets/Apr-06-2026_at_17.48.42-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 17.48.42</div></div>
+<h3 class="sub-title" id="confusion-matrix">Confusion matrix</h3>
+<p>The confusion matrix shows how well the model classified the 20% test set. Look for:</p>
+<ul>
+  <li>HIGH recall: what percentage of actual HIGH events were correctly predicted as HIGH?</li>
+</ul>
+<p>Because you used <code class="inline">maximize_minimum_recall</code>, this should be the strongest class.</p>
+<ul>
+  <li>LOW precision: how many LOW predictions were actually LOW?</li>
+  <li>Any systematic misclassification between MEDIUM and HIGH?</li>
+</ul>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/fff7f39dfebd0da89c4bb3fb2385ece4/assets/Apr-06-2026_at_17.53.06-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 17.53.06</div></div>
+<h3 class="sub-title" id="feature-importance">Feature importance</h3>
+<p>Click any document in the results table. The <strong>Feature importance</strong> panel shows which fields drove that specific prediction. For a HIGH-risk document you should see <code class="inline">ping_one.audit.risk.score</code> or <code class="inline">oracle.database_audit.privilege</code> near the top.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/fecd7248a9b3e06b5406f2f6cbb53186/assets/Apr-06-2026_at_17.53.43-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 17.53.43</div></div>
+<p><strong>Discussion:</strong> Feature importance answers <em>why</em> the model made a prediction — not just <em>what</em> it predicted. This is the difference between a black-box score and an auditable finding. In a mortgage compliance context, being able to show an auditor <em>why</em> a transaction was flagged is as important as flagging it correctly.</p>
+<h3 class="sub-title" id="read-the-final-hyperparameters-after-training">Read the final hyperparameters after training</h3>
+<p>Navigate to DevTools:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/6bbf9dc00526481f01bee7535ce6bc14/assets/Apr-07-2026_at_09.37.18-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-07-2026 at 09.37.18</div></div>
+<p>Once training completes, run this in Dev Tools:</p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>GET /_ml/data_frame/analytics/mortgage-privileged-access-classification/_stats</code></pre></div>
+<p>Find <code class="inline">analysis_stats.classification_stats.hyperparameters</code> in the response. It will look similar to this — your auto-tuned values will differ from run to run:</p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">JSON</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>"hyperparameters": {
+  "class_assignment_objective": "maximize_minimum_recall",
+  "alpha":                 0.84,
+  "downsample_factor":     0.91,
+  "eta":                   0.1,
+  "eta_growth_rate":       1.02,
+  "feature_bag_fraction":  0.5,
+  "gamma":                 0.1,
+  "lambda":                0.1,
+  "max_optimization_rounds_per_hyperparameter": 2,
+  "max_trees":             894,
+  "num_folds":             5,
+  "num_splits_per_feature": 75,
+  "soft_tree_depth_limit": 3.05,
+  "soft_tree_depth_tolerance": 0.13
+}</code></pre></div>
+<p>Your four pre-set values appear exactly as you entered them. Everything else was determined by the Bayesian optimizer. Here is what each auto-tuned value means and what it tells you about how this particular model was built:</p>
+<p><strong><code class="inline">alpha: 0.84</code></strong> — This is an L2 penalty on the total count of leaf nodes across the entire forest, distinct from lambda which penalizes individual leaf <em>weights</em>. Alpha controls how many leaves the forest is allowed to grow in aggregate. A value near 1 means the optimizer found that moderate tree density produced the best validation score — not too sparse, not too bushy. If alpha had come back very high (10+), that would indicate the optimizer was aggressively pruning the forest and the model may be underfitting.</p>
+<p><strong><code class="inline">downsample_factor: 0.91</code></strong> — In each boosting round, only 91% of the training documents are used to compute the gradient. This stochastic subsampling adds controlled noise that acts as another regularizer — it prevents the model from perfectly memorizing any individual training example. A value close to 1.0 (as selected here) indicates the dataset is large enough that full-sample gradients are nearly as good as subsampled ones. A much lower value (0.5) would suggest high variance in the training data that benefits from more aggressive subsampling.</p>
+<p><strong><code class="inline">eta_growth_rate: 1.02</code></strong> — The learning rate is not actually constant throughout training. It starts at your specified <code class="inline">eta: 0.1</code> and increases by 2% for each new tree added. This adaptive schedule means early trees make careful small corrections while later trees, once the model is already well-calibrated, can afford to take larger steps. The growth rate of 1.02 is intentionally conservative — with 894 trees and a 2% growth rate, the effective learning rate by the final tree is approximately <code class="inline">0.1 × 1.02^894 ≈ 7,800</code>, which sounds large but is tempered by the diminishing residuals available to correct at that stage.</p>
+<p><strong><code class="inline">max_trees: 894</code></strong> — The optimizer found that 894 trees produced the best validation score before early stopping fired. This is a meaningful number to understand: it is not the maximum allowed trees, it is the number the model actually used. Check the <code class="inline">iteration</code> field in the same stats output — if it matches <code class="inline">max_trees</code>, the model used all allocated trees and more might improve results. If <code class="inline">iteration</code> is significantly lower, early stopping kicked in before the limit, which is the healthy case and indicates the model converged naturally.</p>
+<p><strong><code class="inline">soft_tree_depth_limit: 3.05</code> and <code class="inline">soft_tree_depth_tolerance: 0.13</code></strong> — Rather than a hard maximum depth, DFA uses a soft depth limit with a tolerance band. Trees are allowed to grow beyond <code class="inline">soft_tree_depth_limit</code> but pay an increasing penalty for each additional level. The tolerance of 0.13 determines how quickly that penalty escalates. A depth limit near 3 means the forest primarily uses shallow trees (3–4 levels), which aligns well with this dataset: the underlying risk patterns are relatively simple combinations of a small number of fields, and deep trees would be overcomplicating the problem.</p>
+<p><strong>Discussion for the audience:</strong> Notice that the optimizer agreed with the regularization intent behind your manual settings. It chose a moderate <code class="inline">alpha</code>, a near-full <code class="inline">downsample_factor</code>, and shallow trees — all consistent with a well-regularized model that generalizes rather than memorizes. When the auto-tuned values reinforce rather than fight your manual choices, that is a signal the manual values were sensible for the data. If the optimizer had returned <code class="inline">alpha: 0.01</code> (very bushy trees) alongside your <code class="inline">lambda: 0.1</code> (conservative leaf weights), that tension would be worth investigating — it would suggest the two regularizers are working against each other and the problem may benefit from a different tuning approach.</p>
+<hr>
+<h2 class="section-title" id="1-6-confirm-the-trained-model"><span class="step-num" style="background:var(--ch1)">1.6</span> Confirm the Trained Model</h2>
+<hr>
+<p>Retrieve the Trained Model via Dev Tools:</p>
+<p><strong>Note the exact model ID</strong> — you need it in the next step.</p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>GET /_ml/trained_models?tags=mortgage-privileged-access-classification&amp;human=true</code></pre></div>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/3319cd2856ccd0be65c9b81aba8bc1f1/assets/Apr-07-2026_at_13.24.55-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-07-2026 at 13.24.55</div></div>
+<p>Confirm <code class="inline">model_type: tree_ensemble</code> is present — this is a deployable model.</p>
+<hr>
+<h2 class="section-title" id="1-7-deploy-as-an-ingest-pipeline"><span class="step-num" style="background:var(--ch1)">1.7</span> Deploy as an Ingest Pipeline</h2>
+<hr>
+<p>Now deploy the trained model so every new event is scored on ingest.</p>
+<p>Using Dev Tools — replace <code class="inline">&lt;timestamp&gt;</code> with the actual model ID you noted above:</p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>PUT /_ingest/pipeline/mortgage-privileged-access-ml
+{
+  "description": "Score PingOne and Oracle audit events for privileged access risk",
+  "processors": [
+    {
+      "inference": {
+        "model_id": "mortgage-privileged-access-classification-{{timestamp}}",
+        "target_field": "ml",
+        "field_mappings": {},
+        "inference_config": {
+          "classification": {
+            "num_top_classes": 3,
+            "results_field": "risk_level_prediction",
+            "top_classes_results_field": "top_classes"
+          }
+        },
+        "on_failure": [
+          {
+            "set": {
+              "field": "ml.inference_error",
+              "value": "{{ _ingest.on_failure_message }}"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}</code></pre></div>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/7323cd4c6b9daafdb3ecf85094359963/assets/Apr-07-2026_at_13.28.26-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-07-2026 at 13.28.26</div></div>
+<h3 class="sub-title" id="test-the-pipeline-before-wiring-it">Test the pipeline before wiring it</h3>
+<p>Simulate against a PingOne document:</p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>POST /_ingest/pipeline/mortgage-privileged-access-ml/_simulate
+{
+  "docs": [
+    {
+      "_source": {
+        "ping_one.audit.risk.score": 91.5,
+        "ping_one.audit.action.type": "AUTHENTICATION",
+        "ping_one.audit.result.status": "FAILED",
+        "event.outcome": "failure"
+      }
+    }
+  ]
+}</code></pre></div>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/1962444fa364d35db8b74bc2571062ab/assets/Apr-07-2026_at_13.30.01-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-07-2026 at 13.30.01</div></div>
+<p>Simulate against an Oracle document:</p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>POST /_ingest/pipeline/mortgage-privileged-access-ml/_simulate
+{
+  "docs": [
+    {
+      "_source": {
+        "oracle.database_audit.action": "DROP TABLE",
+        "oracle.database_audit.privilege": "SYSDBA",
+        "event.outcome": "success"
+      }
+    }
+  ]
+}</code></pre></div>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/0a87cf65a99238803f5ef0eb90d0b542/assets/Apr-07-2026_at_13.30.31-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-07-2026 at 13.30.31</div></div>
+<p>Both should return <code class="inline">ml.risk_level_prediction</code> as <code class="inline">LOW</code>, <code class="inline">MEDIUM</code>, or <code class="inline">HIGH</code> with a <code class="inline">ml.top_classes</code> array showing probabilities for all three classes. If you see <code class="inline">ml.inference_error</code> instead, check the model ID.</p>
+<hr>
+<h2 class="section-title" id="1-8-wire-the-pipeline-to-both-indices"><span class="step-num" style="background:var(--ch1)">1.8</span> Wire the Pipeline to Both Indices</h2>
+<hr>
+<p>Apply the pipeline at the data stream level using <code class="inline">_settings</code> on the data stream name directly. This propagates to the current backing index and any future rollovers without needing to touch individual <code class="inline">.ds-*</code> index names:</p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>PUT /logs-ping_one.audit-mortgage/_settings
+{
+  "index": { "default_pipeline": "mortgage-privileged-access-ml" }
+}
+
+PUT /logs-oracle.database_audit-mortgage/_settings
+{
+  "index": { "default_pipeline": "mortgage-privileged-access-ml" }
+}</code></pre></div>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/149e48b5ab66da99b7239b6aac11b6ab/assets/Apr-07-2026_at_13.31.40-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-07-2026 at 13.31.40</div></div>
+<p>Verify the setting was applied:</p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>GET /logs-ping_one.audit-mortgage/_settings/index.default_pipeline
+GET /logs-oracle.database_audit-mortgage/_settings/index.default_pipeline</code></pre></div>
+<p>Both should return <code class="inline">"mortgage-privileged-access-ml"</code>.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/4e91e9d658ce997433cd915b0f15f687/assets/Apr-07-2026_at_13.32.38-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-07-2026 at 13.32.38</div></div>
+<hr>
+<h3 class="sub-title" id="optional-view-ingest-pipeline-via-ui">OPTIONAL:  View Ingest Pipeline via UI</h3>
+<p>Search for <code class="inline">ingest pipelines</code> in the top search bar and select the top result:</p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>ingest pipelines</code></pre></div>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/fdb778ea009705d668434d20faa283e9/assets/Apr-08-2026_at_10.32.20-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-08-2026 at 10.32.20</div></div>
+<p>Search for your recently created ingest pipeline:</p>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>mortgage-privileged-access-ml</code></pre></div>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/f25c12275dd0f87ff4309cba9ee92b50/assets/Apr-08-2026_at_10.34.17-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-08-2026 at 10.34.17</div></div>
+<p>Click on the <code class="inline">Edit pipeline</code> button:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/9753156ae3ea64e1613e0f7806547ba6/assets/Apr-08-2026_at_10.35.00-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-08-2026 at 10.35.00</div></div>
+<p>Click on <code class="inline">Inference</code> to observe what this processor looks like in the UI:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/62aad06cc24750c21090d6af2e6ede35/assets/Apr-08-2026_at_10.35.50-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-08-2026 at 10.35.50</div></div>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/28735a273731f3d70bed93aa3dfea488/assets/Apr-08-2026_at_10.36.28-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-08-2026 at 10.36.28</div></div>
+<h2 class="section-title" id="1-9-observe-predictions-in-discover"><span class="step-num" style="background:var(--ch1)">1.9</span> Observe Predictions in Discover</h2>
+<hr>
+<div class="callout important"><div class="callout-icon">⚠</div><div class="callout-body"><div class="callout-title">Important</div><p>Re-initiate data generation first, click this button hop over to the <code class="inline">host-1</code> cli:
+
+<a href="tab-1" target="_blank">button label="host1-cli"</a></p></div></div>
+<p>Run the following command:</p>
+<div class="callout important"><div class="callout-icon">⚠</div><div class="callout-body"><div class="callout-title">Important</div><div class="code-wrap"><div class="code-header"><span class="code-lang">BASH</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>bash  /workspace/workshop/elastic-ml-lifecycle-automation/Scripts/livedata.sh</code></pre></div>
+</div></div>
+<p>You are ready to move on when your screen resembles this:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/405dac0271971de6e61b73a872d878ad/assets/Apr-07-2026_at_13.39.49-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-07-2026 at 13.39.49</div></div>
+<div class="callout important"><div class="callout-icon">⚠</div><div class="callout-body"><div class="callout-title">Important</div><p>Go back to Kibana, click this button hop back:
+
+<a href="tab-0" target="_blank">button label="Kibana"</a></p></div></div>
+<p>Navigate to <strong>Kibana → Discover</strong> by searching for <code class="inline">Discover</code> in your top search bar, select the top result.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/6b5217223f04357d38376e440598b102/assets/Apr-07-2026_at_13.42.48-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-07-2026 at 13.42.48</div></div>
+<p>Select the <code class="inline">logs-ping_one.audit-mortgage</code> data view. Set the time range to the last 15 minutes to see only new documents that arrived after the pipeline was applied.</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/2e91563e4e64a6ba100b53c13d608612/assets/Apr-07-2026_at_13.43.24-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-07-2026 at 13.43.24</div></div>
+<p>Add these columns to the table:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Column</th><th>What it shows</th></tr></thead>
+<tbody><tr><td><code class="inline">@timestamp</code></td><td>When the event arrived</td></tr><tr><td><code class="inline">event.outcome</code></td><td>success / failure</td></tr><tr><td><code class="inline">ping_one.audit.risk.score</code></td><td>Raw IAM risk score</td></tr><tr><td><code class="inline">ping_one.audit.action.type</code></td><td>What IAM action occurred</td></tr><tr><td><code class="inline">ml.risk_level_prediction</code></td><td>Model prediction: LOW / MEDIUM / HIGH</td></tr><tr><td><code class="inline">ml.top_classes</code></td><td>All three class probabilities</td></tr></tbody></table></div>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/bd2375ecc1b9dc1d7f9c4f0a8ff9aaca/assets/Apr-07-2026_at_14.41.05-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-07-2026 at 14.41.05</div></div>
+<p>Every new document should have <code class="inline">ml.risk_level_prediction</code> populated.</p>
+<p><strong>Filter to HIGH predictions only:</strong></p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/245321699ba72aec0f478dbd64f32ec9/assets/Apr-07-2026_at_14.41.37-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-07-2026 at 14.41.37</div></div>
+<div class="code-wrap"><div class="code-header"><span class="code-lang">CODE</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div><pre><code>ml.risk_level_prediction : "HIGH"</code></pre></div>
+<p><strong>Questions about our data:</strong></p>
+<ul>
+  <li>Why do documents with <code class="inline">ping_one.audit.risk.score</code> above 70 and <code class="inline">event.outcome: failure</code></li>
+</ul>
+<p>consistently predict HIGH?</p>
+<ul>
+  <li>What does a HIGH prediction with 0.95 probability tell you versus 0.55 probability?</li>
+</ul>
+<details><summary>💬 Answers</summary><div class="details-body"><h2>Why do documents with `ping_one.audit.risk.score` above 70 and `event.outcome: failure` consistently predict HIGH?</h2>
+<p>Because those two features together represent exactly the pattern the model was trained to associate with HIGH-risk labels. During training, documents in the HIGH class were disproportionately clustered at elevated risk scores and failure outcomes; those correlations were not random, they were embedded by the data generator to simulate real attacker behaviour. The gradient boosted tree algorithm found that risk.score > 70 was one of the strongest splits early in the tree ensemble because it cleanly separates HIGH from LOW/MEDIUM across a large fraction of the training set. event.outcome: failure reinforces that split ~ a high-risk score on a successful authentication is ambiguous, but a high-risk score on a failed authentication is the signature of a brute-force or credential stuffing attempt. The two features in combination create a decision path through the tree ensemble that almost always terminates at a HIGH leaf node, because that path matched HIGH-labeled documents repeatedly during training. Feature importance in the results view will confirm this, those two fields will appear near the top, which means they had the most influence on reducing prediction error across the most training examples.</p>
+<h2>What does a HIGH prediction with 0.95 probability tell you versus 0.55 probability?</h2>
+<p>Probability is the model's confidence in its own classification, not just the class label. At 0.95 the model is telling you the document sits deep within the HIGH region of the feature space; it matched the HIGH pattern decisively across many trees in the ensemble, and the alternative classes (LOW, MEDIUM) were not competitive. You can act on this with high confidence and low noise. At 0.55 the model is telling you the document is technically above the threshold for HIGH but only marginally; it's near the decision boundary where the feature combination is genuinely ambiguous and the ensemble was split on what to predict. That event might warrant investigation but also might resolve as a false positive. The practical consequence for a SOC is that these two predictions should be treated differently. An alert that fires on every ml.risk_level_prediction: HIGH regardless of probability will include a lot of 0.55-0.65 predictions that drain analyst time. A well-calibrated alert filters on something like ml.risk_level_prediction: HIGH AND ml.top_classes.HIGH.probability >= 0.85, which targets the confident end of the distribution and dramatically reduces false positive volume. The ml.top_classes field written by the inference pipeline contains the probability for each class per document, so this filter is directly queryable in KQL and ES|QL.</p>
+</div></details>
+<hr>
+<p>You are now ready to move onto the next exercise by pressing <code class="inline">Next</code>:</p>
+<div class="screenshot-wrap"><img src="https://play.instruqt.com/assets/tracks/1nedhyisyw5x/26c9ffa607eb09146d57fea140c0f823/assets/Apr-06-2026_at_16.00.27-image.png" alt="Screenshot" loading="lazy"><div class="caption">Apr-06-2026 at 16.00.27</div></div>
+
+
+    <div class="chapter-nav">
+      <a class="nav-btn" href="instruqt-chapter-0-setup.html"><span class="arrow">←</span> Ch 0: Setup &amp; Environment Review</a>
+      <div class="nav-center">Chapter 1 of 3</div>
+      <a class="nav-btn next" href="instruqt-chapter-2-agent-workflow.html">Ch 2: AI Agent Analysis and Workfl <span class="arrow">→</span></a>
+    </div>
+  </div>
+
+</div>
+<script>
+function copyCode(btn) {
+  const code = btn.closest('.code-wrap').querySelector('code');
+  navigator.clipboard.writeText(code.innerText).then(() => {
+    btn.textContent = '✓ copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 1800);
+  });
+}
+</script>
+</body>
+</html>
