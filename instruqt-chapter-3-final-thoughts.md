@@ -1,15 +1,3 @@
----
-> *Elastic ML Classification Workshop — LendPath Mortgage Platform*
-
-| Chapter | File |
-|---|---|
-| [Chapter 0 — Setup & Environment Review](docs-chapter-0-setup.md) |  |
-| [Chapter 1 — Build and Train a Classification Job](docs-chapter-1-classification.md) |  |
-| [Chapter 2 — AI Agent Analysis and Workflow Automation](docs-chapter-2-agent-workflow.md) |  |
-| [Chapter 3 — Final Thoughts & Take-Aways](docs-chapter-3-final-thoughts.md) | **→ current** |
-
----
-
 # Chapter 3 — Final Thoughts & Take-Aways
 
 **Objective:** Review accomplishments and save assets.
@@ -18,6 +6,7 @@
 
 
 ## 3.1 — Your Accomplishments
+===
 
 This workshop demonstrated three distinct levels of ML operationalization:
 
@@ -47,10 +36,12 @@ is usually the right call.
 
 
 ## 3.2 — Downloadable Components
+===
 
 Below are the individual components that you may leverage within your own environment should you wish.
 
 ### — Workflow
+===
 
 ```yaml
 name: DFA Classification — Auto-Setup
@@ -333,6 +324,7 @@ steps:
 
 
 ### — Agent Tool
+===
 
 Navigate to **Agents → Tools → New Tool** by searching for `agent tools` in the top search and select the top result to configure a `+ New tool`:
 
@@ -355,6 +347,7 @@ Navigate to **Agents → Tools → New Tool** by searching for `agent tools` in 
 
 
 ### — AI Agent
+===
 
 ```
 POST kbn://api/agent_builder/agents
@@ -385,6 +378,7 @@ POST kbn://api/agent_builder/agents
 
 
 ## 3.3 — Mission ~~Im~~possible
+===
 
 
 ### Challenge — Apply this to a Different Domain, should you choose to accept it
@@ -431,7 +425,3 @@ built in section 2.4 will create the job with no modification required.
 
 This is the real-world version of what you practised in the workshop. The tools
 are the same. The methodology is the same. The only variable is the data.
-
----
-
-[← Chapter 2 — AI Agent Analysis and Workflow Automation](docs-chapter-2-agent-workflow.md) |
