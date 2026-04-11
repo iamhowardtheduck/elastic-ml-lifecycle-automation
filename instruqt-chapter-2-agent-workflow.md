@@ -1,15 +1,3 @@
----
-> *Elastic ML Classification Workshop — LendPath Mortgage Platform*
-
-| Chapter | File |
-|---|---|
-| [Chapter 0 — Setup & Environment Review](docs-chapter-0-setup.md) |  |
-| [Chapter 1 — Build and Train a Classification Job](docs-chapter-1-classification.md) |  |
-| [Chapter 2 — AI Agent Analysis and Workflow Automation](docs-chapter-2-agent-workflow.md) | **→ current** |
-| [Chapter 3 — Final Thoughts & Take-Aways](docs-chapter-3-final-thoughts.md) |  |
-
----
-
 # Chapter 2 — AI Agent Analysis and Workflow Automation
 
 **Objective:** Use Elastic Agent Builder and built-in platform tools to discover and analyze the `logs-mortgage.audit-default` dataset autonomously, then use a parameterised Elastic Workflow — triggered directly by the agent — to automatically create the `mortgage-audit-classification` job.
@@ -17,6 +5,7 @@
 ---
 
 ## 2.1 — Enable Workflows
+===
 
 Enable the feature flag, `Save changes`, then refresh Kibana.
 ![Apr-07-2026_at_15.56.43-image.png](https://play.instruqt.com/assets/tracks/1nedhyisyw5x/3f0cedbf967384b6e3fb324c2472395c/assets/Apr-07-2026_at_15.56.43-image.png)
@@ -35,6 +24,7 @@ You should now see **Workflows** in the left navigation under the `Management` s
 
 
 ## 2.2 — Build the AI Agent
+===
 
 Navigate to **Elasticsearch → Agents** (from the side navigation).
 
@@ -78,8 +68,7 @@ Navigate to **Elastic AI Agent → + New**.
 - **Agent ID:** <pre><code>ml_readiness_analyst</code></pre>
 - **Custom Instructions:**
 
-```
-You are an expert ML analyst who evaluates Elasticsearch data to determine
+<pre><code>You are an expert ML analyst who evaluates Elasticsearch data to determine
 whether it is suitable for training a Data Frame Analytics classification model.
 
 You have access to built-in Elastic tools that let you discover indices, retrieve
@@ -159,8 +148,7 @@ Do not call the tool unless the user has explicitly confirmed.
 Always base every recommendation on what the tools actually return.
 Never assume field names, values, or distributions without querying first.
 This methodology works for any domain — security logs, network traffic, financial
-transactions, healthcare records, or any structured time-series data.
-```
+transactions, healthcare records, or any structured time-series data.</code></pre>
 
 - **Display Name:**  <pre><code>ML Readiness Analyst</code></pre>
 - **Display Description:** <pre><code>Explores any Elasticsearch index to assess whether the data is suitable for ML classification training — discovers fields, analyses distributions, evaluates class balance, and recommends model configuration</code></pre>
@@ -187,6 +175,7 @@ Click on `Tools` to configure which features your agent will have access to:
 
 
 ## 2.3 — Chat with the Agent
+===
 
 ![Apr-07-2026_at_16.12.47-image.png](https://play.instruqt.com/assets/tracks/1nedhyisyw5x/7eaa59d07ee9d4a84ef5f26f5805b048/assets/Apr-07-2026_at_16.12.47-image.png)
 
@@ -197,13 +186,11 @@ give it only a natural language description of what you want — no index names,
 field names, no Dev Tools steps required from the student.
 
 **Opening prompt:**
-```
-I want to train an Elastic Data Frame Analytics classification model to detect
+<pre><code>I want to train an Elastic Data Frame Analytics classification model to detect
 suspicious access events in our mortgage platform audit logs. I have not told you
 which index to use or what fields it contains. Please find the right data, discover
 the schema, assess whether it is suitable for classification training, and recommend
-a complete model configuration.
-```
+a complete model configuration.</code></pre>
 
 Watch the sequence of tool calls the agent makes without any further prompting.
 
@@ -255,18 +242,14 @@ how `analyzed_fields.excludes` works in the API, it calls `product_documentation
 
 **Follow-up prompts**
 
-```
-Which fields have the strongest predictive signal? Are there fields I should definitely exclude?
-```
+<pre><code>Which fields have the strongest predictive signal? Are there fields I should definitely exclude?</code></pre>
 
 The agent reasons over the distribution results it already collected — a field
 where MIN == MAX has no predictive value; a field with many nulls should be
 excluded; a field whose distribution differs significantly between the suspicious
 and non-suspicious class is a strong feature.
 
-```
-Based on everything you have found, write out the complete PUT request I should run in Dev Tools to create the mortgage-audit-classification job.
-```
+<pre><code>Based on everything you have found, write out the complete PUT request I should run in Dev Tools to create the mortgage-audit-classification job.</code></pre>
 
 This produces a ready-to-run `PUT /_ml/data_frame/analytics/...` block the student
 can paste directly into Dev Tools. The agent's configuration should closely match
@@ -291,8 +274,10 @@ manually, and what the Workflow will automate entirely.
 
 
 ## 2.4 — Build the Automation Workflow
+===
 
 
+<br>
 
 ### Step 1 — Create the Workflow
 
@@ -675,13 +660,11 @@ Once all these steps are completed, chat with the agent:
 ![Apr-08-2026_at_11.08.34-image.png](https://play.instruqt.com/assets/tracks/1nedhyisyw5x/d603d43920b5a0b4510f7acf2b8c1cc8/assets/Apr-08-2026_at_11.08.34-image.png)
 
 **Ask again:**
-```
-I want to train an Elastic Data Frame Analytics classification model to detect
+<pre><code>I want to train an Elastic Data Frame Analytics classification model to detect
 suspicious access events in our mortgage platform audit logs. I have not told you
 which index to use or what fields it contains. Please find the right data, discover
 the schema, assess whether it is suitable for classification training, and recommend
-a complete model configuration.
-```
+a complete model configuration.</code></pre>
 
 ![Apr-08-2026_at_11.09.50-image.png](https://play.instruqt.com/assets/tracks/1nedhyisyw5x/5c04b02c402e022edba99c4c50aea655/assets/Apr-08-2026_at_11.09.50-image.png)
 
@@ -695,6 +678,7 @@ The **ML Readiness Analyst** agent has now built your classification data frame 
 
 
 ## 2.5 — Review Workflow Execution
+===
 
 Search for `workflows` in your top search bar:
 ![Apr-08-2026_at_11.15.52-image.png](https://play.instruqt.com/assets/tracks/1nedhyisyw5x/e117daf42f5ebdfe49acbb6361a997a1/assets/Apr-08-2026_at_11.15.52-image.png)
@@ -726,6 +710,7 @@ with what data, which is important for compliance in a mortgage context.
 
 
 ## 2.6 — Start the Job and Monitor Training
+===
 
 Navigate to **Machine Learning → Data Frame Analytics** by searching for ```data frame analytics``` in the top search bar:
 ![Apr-08-2026_at_11.19.53-image.png](https://play.instruqt.com/assets/tracks/1nedhyisyw5x/9d872e617dd901c0f9afc1e3c477d189/assets/Apr-08-2026_at_11.19.53-image.png)
@@ -759,8 +744,7 @@ You will have to *`Create a data view`* in order to see the results:
 >
 >If not and you click the hyperlink, a new tab will appear:
 >
->**→ Switch to tab: `Data View Creation`**
-
+>[button label="Data View Creation"](tab-2)
 
 Provide the following:
 
@@ -779,8 +763,7 @@ Then press `Save data view to Kibana`:
 > [!IMPORTANT]
 >Click the button below to quickly navigate back to the details of the classification job:
 >
->**→ Switch to tab: `Kibana`**
-
+>[button label="Kibana"](tab-0)
 
 You can observe the details of the classification job:
 ![Apr-08-2026_at_11.29.06-image.png](https://play.instruqt.com/assets/tracks/1nedhyisyw5x/4d1b8d79eb6d64ebd74964df1cf1d1e5/assets/Apr-08-2026_at_11.29.06-image.png)
@@ -790,6 +773,7 @@ You can observe the details of the classification job:
 
 
 ## 2.7 — Deploy as Inference Pipeline
+===
 
 
 Once training is complete, get the model ID, navigate to DevTools:
@@ -854,22 +838,21 @@ GET /logs-mortgage.audit-default/_settings/index.default_pipeline
 ![Apr-08-2026_at_11.32.44-image.png](https://play.instruqt.com/assets/tracks/1nedhyisyw5x/9fa6e51e5b55b013fb1da4b93441cde9/assets/Apr-08-2026_at_11.32.44-image.png)
 
 ## 2.8 — Ingest, Infer, and Observe
+===
 
 > [!IMPORTANT]
 >Re-initiate data generation first, click this button hop over to the `host-1` cli:
 >
->**→ Switch to tab: `host1-cli`**
-
+>[button label="host1-cli"](tab-1)
 
 
 Run the following command:
 
 > [!IMPORTANT]
 >
->```bash
+>``` run
 >bash  /workspace/workshop/elastic-ml-lifecycle-automation/Scripts/livedata.sh
 >```
-
 
 Once you observe:
 ![Apr-08-2026_at_11.40.55-image.png](https://play.instruqt.com/assets/tracks/1nedhyisyw5x/1c20f6be98b38fbaa5970a8b6fb99f12/assets/Apr-08-2026_at_11.40.55-image.png)
@@ -877,8 +860,7 @@ Once you observe:
 > [!IMPORTANT]
 >Go back to Kibana, click this button hop back:
 >
->**→ Switch to tab: `Kibana`**
-
+>[button label="Kibana"](tab-0)
 
 Navigate to **Discover***
 
@@ -889,7 +871,3 @@ as a column. Every new audit event now has a real-time ML prediction attached to
 
 ![Apr-08-2026_at_11.36.07-image.png](https://play.instruqt.com/assets/tracks/1nedhyisyw5x/ed020016e27972a611efb0d317ede4c1/assets/Apr-08-2026_at_11.36.07-image.png)
 ---
-
----
-
-[← Chapter 1 — Build and Train a Classification Job](docs-chapter-1-classification.md) | [Chapter 3 — Final Thoughts & Take-Aways →](docs-chapter-3-final-thoughts.md)
