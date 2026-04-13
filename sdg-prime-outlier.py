@@ -84,6 +84,8 @@ except ImportError:
     _HAS_CAL = False
 
 CONFIG_FILE = os.path.join(_HERE, "workshop-config-outlier.json")
+# Also check the Instruqt workspace path where bootstrap writes the config
+_WORKSPACE_CONFIG = "/workspace/workshop/elastic-ml-lifecycle-automation/workshop-config-outlier.json"
 
 # ── Parallelism defaults (mirrors classification SDG) ────────────────────────
 
@@ -597,7 +599,7 @@ def live_generate(es, epd, anomaly_pct, backfill_days, tz,
 
 # ── Backfill ──────────────────────────────────────────────────────────────────
 
-def backfill(es, days, epd, anomaly_pct, tz,
+def backfill(es, host, days, epd, anomaly_pct, tz,
              workers, bulk_size, pb_threads, pb_queue):
 
     today     = datetime.now(tz).date()
@@ -650,14 +652,33 @@ def backfill(es, days, epd, anomaly_pct, tz,
     print(f"  {'TOTAL':<28} {total_docs:>8,}")
     print()
 
-    # Verify data stream exists
+    # Verify data stream exists — distinguish real "not found" from
+    # connection/auth/SSL errors so the message is actionable.
     print("  Checking data stream…")
     try:
         es.indices.get_data_stream(name=TARGET_INDEX)
         print(f"  ✓ {TARGET_INDEX}")
-    except Exception:
-        print(f"  ✗ {TARGET_INDEX} — NOT FOUND. "
-              "Run bootstrap-outlier.py first.")
+    except Exception as _ds_err:
+        _msg = str(_ds_err)
+        if any(x in _msg for x in ("404", "index_not_found",
+                                    "no such index", "not found")):
+            print(f"  ✗ {TARGET_INDEX} — data stream does not exist.")
+            print( "    Run bootstrap-outlier.py first, then re-run.")
+        elif any(x in _msg.lower() for x in ("401", "403",
+                                               "unauthorized", "forbidden")):
+            print(f"  ✗ Auth error — check --user / --password")
+            print(f"    or workshop-config-outlier.json")
+            print(f"    Detail: {_msg[:200]}")
+        elif any(x in _msg.lower() for x in ("ssl", "certificate")):
+            print(f"  ✗ SSL error — try adding --no-verify-ssl")
+            print(f"    Detail: {_msg[:200]}")
+        elif any(x in _msg.lower() for x in
+                 ("connection", "refused", "timeout", "connect")):
+            print(f"  ✗ Cannot reach Elasticsearch at: {host}")
+            print( "    Check the host URL and that ES is running.")
+            print(f"    Detail: {_msg[:200]}")
+        else:
+            print(f"  ✗ Unexpected error: {_msg[:300]}")
         sys.exit(1)
     print()
 
@@ -813,7 +834,10 @@ anomaly-pct guidance:
     host, user, password, no_ssl = (
         args.host, args.user, args.password, args.no_verify_ssl
     )
+    # Try the script-local config first, then the Instruqt workspace path
     cfg_file = CONFIG_FILE
+    if not os.path.exists(cfg_file) and os.path.exists(_WORKSPACE_CONFIG):
+        cfg_file = _WORKSPACE_CONFIG
     if os.path.exists(cfg_file):
         try:
             cfg      = json.load(open(cfg_file))
@@ -841,6 +865,12 @@ anomaly-pct guidance:
 
     es = Elasticsearch(host, basic_auth=(user, password), **ssl_opts)
 
+    # Confirm the resolved connection settings so problems are visible
+    print(f"  Host         : {host}")
+    print(f"  User         : {user}")
+    print(f"  Verify SSL   : {verify_ssl}")
+    print(f"  Config file  : {cfg_file if os.path.exists(cfg_file) else '(not found — using CLI defaults)'}")
+
     tz      = resolve_tz(args.timezone)
     workers = args.workers or DEFAULT_WORKERS
 
@@ -850,7 +880,7 @@ anomaly-pct guidance:
         return
 
     backfill_days = backfill(
-        es, args.days, args.events_per_day, args.anomaly_pct, tz,
+        es, host, args.days, args.events_per_day, args.anomaly_pct, tz,
         workers, args.bulk_size, args.pb_threads, args.pb_queue,
     )
 
