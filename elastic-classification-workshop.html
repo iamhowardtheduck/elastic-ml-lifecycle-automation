@@ -82,7 +82,7 @@
   .slides-wrap { margin-top:68px; width:100%; max-width:980px; }
   .slide {
     display:none; width:100%; aspect-ratio:16/9;
-    border-radius:10px; overflow:hidden;
+    border-radius:10px; overflow:clip;
     box-shadow:0 24px 64px rgba(0,0,0,0.55);
     animation:fadeUp .3s cubic-bezier(.22,1,.36,1);
     position:relative;
@@ -178,7 +178,16 @@
     background:white;
     flex-direction:column;
     padding:5% 6.5%;
+    overflow-y:auto;
+    overflow-x:hidden;
   }
+  /* Scrollbar styling — Elastic branded */
+  .s-content::-webkit-scrollbar { width:6px; }
+  .s-content::-webkit-scrollbar-track { background:var(--light-grey); border-radius:3px; }
+  .s-content::-webkit-scrollbar-thumb { background:var(--elastic-blue); border-radius:3px; }
+  .s-content::-webkit-scrollbar-thumb:hover { background:var(--midnight); }
+  /* Firefox */
+  .s-content { scrollbar-width:thin; scrollbar-color:var(--elastic-blue) var(--light-grey); }
   .slide-label {
     font-family:var(--font-code); font-size:clamp(7px,.75vw,8.5px);
     font-weight:700; letter-spacing:.15em; text-transform:uppercase;
