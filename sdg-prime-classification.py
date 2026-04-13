@@ -279,7 +279,7 @@ _LAST_NAMES  = ["Smith","Johnson","Williams","Brown","Jones","Garcia","Miller","
 
 _US_CITIES   = [("New York","New York","US"),("Los Angeles","California","US"),
                 ("Chicago","Illinois","US"),("Houston","Texas","US"),
-                ("Phoenix","Arizona","US"),("Philadelphia","Pennsylvania","US"),
+                ("Phoenix","Arizona","US"),("Pittsburgh","Pennsylvania","US"),
                 ("San Antonio","Texas","US"),("San Diego","California","US"),
                 ("Dallas","Texas","US"),("San Jose","California","US"),
                 ("Austin","Texas","US"),("Indianapolis","Indiana","US")]
