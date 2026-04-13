@@ -1,0 +1,242 @@
+# outlier-workshop.yml
+# ━━━━━━━━━━━━━━━━━━━━
+# Field schema reference for the OpsPath Outlier Detection Workshop.
+# This file documents every field in traces-apm.spans-opspath and
+# opspath-span-outliers, including which fields are analyzed, which
+# are excluded, and what the DFA outputs.
+#
+# Use this as a reference when building the DFA job via Dev Tools or
+# when configuring the Agent Builder prompt in Chapter 2.
+
+workshop:
+  name: "OpsPath Outlier Detection"
+  scenario: >
+    A fictional SRE team monitoring a 5-service microservices application.
+    Goal: surface anomalous APM spans using unsupervised outlier detection
+    without any pre-defined thresholds or labels.
+  dfa_job_id: "opspath-span-outliers"
+  job_type: "outlier_detection"
+  source_index: "traces-apm.spans-opspath"
+  dest_index:   "opspath-span-outliers"
+
+# ── Source stream ─────────────────────────────────────────────────────────────
+source:
+  data_stream: "traces-apm.spans-opspath"
+  index_template: "traces-apm.spans-opspath"
+
+  services:
+    - api-gateway
+    - order-service
+    - inventory-service
+    - payment-service
+    - notification-svc
+
+  anomaly_types:
+    slow_query:
+      description: "Database query with full table scan — extremely high row count and duration"
+      primary_signal:
+        span.duration.us: "100x–500x normal db span duration"
+        span.db.rows_affected: "50,000–2,000,000 (normal: 0–250)"
+      secondary_signals:
+        span.type: "db"
+        span.subtype: "postgresql or mysql (not redis)"
+        span.action: "query"
+
+    cascade_failure:
+      description: "Downstream service failure propagating up the call chain"
+      primary_signal:
+        span.duration.us: "50x–200x normal external span duration"
+        http.response.status_code: "500, 502, 503, 504"
+      secondary_signals:
+        span.type: "external or db"
+        transaction.result: "HTTP 5xx or error"
+        event.outcome: "failure"
+
+    connection_saturation:
+      description: "Redis connection pool exhaustion — connect action instead of query"
+      primary_signal:
+        span.duration.us: "30x–100x normal redis span duration"
+        span.action: "connect (vs normal: query/get/set)"
+      secondary_signals:
+        span.type: "db"
+        span.subtype: "redis"
+        span.name: "CONNECT redis"
+
+    large_payload:
+      description: "Abnormally large request or response payload"
+      primary_signal:
+        http.request.body.bytes: "2MB–20MB (normal: 64B–8KB)"
+        http.response.body.bytes: "5MB–50MB (normal: 128B–32KB)"
+      secondary_signals:
+        span.type: "external"
+        span.duration.us: "moderately elevated (4x–10x normal)"
+
+# ── Analyzed fields (DFA includes) ───────────────────────────────────────────
+analyzed_fields:
+  includes:
+
+    span.duration.us:
+      type: long
+      unit: microseconds
+      role: "Primary feature — most important outlier signal"
+      normal_range: "200–20,000 µs (P5–P95)"
+      anomalous_range: "> 200,000 µs"
+      notes: >
+        Log-normally distributed. The model internally standardises this
+        so that distance-based outlier methods work correctly despite the
+        heavy right tail. Never exclude this field.
+
+    transaction.duration.us:
+      type: long
+      unit: microseconds
+      role: "Correlated with span.duration.us — adds context about parent transaction latency"
+      normal_range: "500–40,000 µs"
+      notes: >
+        Always higher than span.duration.us (transaction wraps multiple spans).
+        Provides a second latency signal that helps distinguish between a slow
+        individual span and a globally slow transaction.
+
+    http.response.status_code:
+      type: integer
+      role: "Categorical-as-numeric — 5xx values co-occur with cascade_failure anomalies"
+      normal_values: "[200, 201, 204, 304]"
+      anomalous_values: "[500, 502, 503, 504]"
+      notes: >
+        Even though this is a status code, DFA treats it as a numeric feature.
+        The gap between normal values (200–304) and anomalous values (500–504)
+        is large enough that the model learns to use it as a discriminating
+        dimension. null for non-HTTP spans (db, app).
+
+    http.response.body.bytes:
+      type: integer
+      unit: bytes
+      role: "Response payload size — elevated for large_payload anomalies"
+      normal_range: "128–32,768 bytes"
+      anomalous_range: "> 5,000,000 bytes"
+      notes: "null for db and app spans — DFA treats null as absent feature"
+
+    http.request.body.bytes:
+      type: integer
+      unit: bytes
+      role: "Request payload size — elevated for large_payload anomalies"
+      normal_range: "64–8,192 bytes"
+      anomalous_range: "> 2,000,000 bytes"
+      notes: "null for db and app spans"
+
+    span.db.rows_affected:
+      type: integer
+      role: "Database row count — extremely high for slow_query anomalies (full table scans)"
+      normal_range: "0–250 rows"
+      anomalous_range: "> 50,000 rows"
+      notes: "null for external and app spans — DFA treats null as absent feature"
+
+  excludes:
+    "@timestamp":
+      reason: >
+        Time must never be a feature. Including it would cause the model to
+        learn WHEN anomalies occur (e.g., Monday 9 AM) rather than WHAT
+        structural properties make them anomalous. Timestamps are identifiers,
+        not features.
+
+    process.pid:
+      reason: >
+        Process identity — arbitrary integer with no relationship to span
+        latency or error rates. Would add noise to the feature space with
+        zero signal gain.
+
+    url.port:
+      reason: >
+        Near-zero variance (8080 for HTTP, 5432 for PostgreSQL, 6379 for Redis).
+        A field with very low variance contributes almost nothing to the outlier
+        score and adds unnecessary dimensions to the feature space.
+
+    event.duration:
+      reason: >
+        Nanosecond duplicate of span.duration.us (event.duration = span.duration.us × 1000).
+        Including both would double-weight duration in the feature space, making
+        the model over-sensitive to latency and under-sensitive to other signals.
+
+# ── DFA output fields ─────────────────────────────────────────────────────────
+dfa_outputs:
+  dest_index: "opspath-span-outliers"
+  results_field: "ml"
+
+  ml.outlier_score:
+    type: float
+    range: "0.0 – 1.0"
+    description: >
+      Ensemble outlier score. Combines LOF (Local Outlier Factor),
+      distance-based outlier detection, and isolation forest into a single
+      normalised score. 0 = densely normal, 1 = extreme outlier.
+    thresholds:
+      low: "< 0.3  — likely normal"
+      medium: "0.3–0.6 — worth investigating"
+      high: "> 0.6  — strongly anomalous"
+      critical: "> 0.9  — extreme outlier"
+
+  "ml.feature_influence.*":
+    description: >
+      Per-field influence scores that sum to 1.0 for each document.
+      Each sub-field (e.g., ml.feature_influence.span\.duration\.us)
+      shows what fraction of the outlier score that field contributed.
+      This is the explainability layer — it tells you WHY a span was
+      flagged, not just that it was flagged.
+    example_slow_query:
+      "ml.feature_influence.span\\.duration\\.us": 0.61
+      "ml.feature_influence.span\\.db\\.rows_affected": 0.28
+      "ml.feature_influence.http\\.response\\.status_code": 0.06
+      "ml.feature_influence.transaction\\.duration\\.us": 0.05
+    example_cascade_failure:
+      "ml.feature_influence.span\\.duration\\.us": 0.42
+      "ml.feature_influence.http\\.response\\.status_code": 0.38
+      "ml.feature_influence.transaction\\.duration\\.us": 0.15
+      "ml.feature_influence.http\\.response\\.body\\.bytes": 0.05
+
+# ── Ground truth labels (NOT analyzed, validation only) ───────────────────────
+ground_truth:
+  labels.is_anomalous:
+    type: boolean
+    analyzed: false
+    description: >
+      Injected by the SDG. true for synthetically anomalous spans.
+      This field was EXCLUDED from analyzed_fields so the model never
+      saw it during training. Use it post-hoc to validate the outlier
+      scores against known ground truth.
+
+  labels.anomaly_type:
+    type: keyword
+    analyzed: false
+    values:
+      - "normal"
+      - "slow_query"
+      - "cascade_failure"
+      - "connection_saturation"
+      - "large_payload"
+    description: >
+      The specific anomaly class assigned by the SDG. Use to understand
+      which anomaly types the model scores highest, and which it misses.
+
+# ── DFA job configuration reference ──────────────────────────────────────────
+dfa_job:
+  id: "opspath-span-outliers"
+  analysis:
+    type: "outlier_detection"
+    compute_feature_influence: true
+    outlier_fraction: 0.05
+    standardization_enabled: true
+    # n_neighbors omitted — auto-tuned by DFA
+    # Methods used: LOF, distance-based, isolation forest (ensemble)
+  model_memory_limit: "200mb"
+  max_num_threads: 1
+
+# ── Ingest pipeline reference ─────────────────────────────────────────────────
+ingest_pipeline:
+  id: "opspath-span-outlier-ml"
+  applied_to: "traces-apm.spans-opspath"
+  inference_config_type: "regression"
+  results_field: "outlier_score"
+  notes: >
+    Outlier models produce a single continuous score, so the inference
+    processor uses "regression" config (not "classification"). The
+    results_field sets where within the ml.* namespace the score lands:
+    ml.outlier_score.
