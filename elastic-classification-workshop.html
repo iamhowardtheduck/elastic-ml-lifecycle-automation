@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Elastic ML — LendPath Classification Workshop</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --elastic-blue:    #0B64DD;
+    --light-teal:      #48EFCF;
+    --light-poppy:     #FF957D;
+    --pink:            #F04E98;
+    --yellow:          #FEC514;
+    --midnight:        #153385;
+    --developer-blue:  #101C3F;
+    --dark-ink:        #1C1E23;
+    --ink:             #343741;
+    --light-grey:      #F5F7FA;
+    --white:           #FFFFFF;
+    --font-body:       'Inter', Arial, sans-serif;
+    --font-code:       'Space Mono', monospace;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--developer-blue);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  /* ── NAV ── */
+  .nav {
+    position: fixed; top:0; left:0; right:0;
+    height: 50px;
+    background: rgba(16,28,63,0.98);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(72,239,207,0.12);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 28px;
+    z-index: 1000;
+  }
+  .nav-brand { display:flex; align-items:center; gap:10px; }
+  .nav-tag {
+    font-size:10px; font-family:var(--font-code);
+    color: var(--light-teal);
+    background: rgba(72,239,207,0.1);
+    border: 1px solid rgba(72,239,207,0.25);
+    border-radius:4px; padding:2px 8px;
+  }
+  .nav-right { display:flex; align-items:center; gap:12px; }
+  .nav-counter { font-family:var(--font-code); font-size:11px; color:rgba(255,255,255,0.4); min-width:48px; text-align:center; }
+  .nav-btn {
+    width:30px; height:30px; border-radius:5px;
+    background:none; border:1px solid rgba(72,239,207,0.25);
+    color:var(--light-teal); cursor:pointer; font-size:13px;
+    display:flex; align-items:center; justify-content:center;
+    transition:all .15s;
+  }
+  .nav-btn:hover { background:rgba(72,239,207,0.08); border-color:var(--light-teal); }
+  .nav-btn:disabled { opacity:.25; cursor:not-allowed; }
+  .toc-btn {
+    font-size:10px; font-family:var(--font-code);
+    color:rgba(255,255,255,0.5); background:none;
+    border:1px solid rgba(255,255,255,0.15); border-radius:4px;
+    padding:4px 10px; cursor:pointer; transition:all .15s; letter-spacing:.05em;
+  }
+  .toc-btn:hover { background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.8); }
+
+  /* ── PROGRESS ── */
+  .progress {
+    position:fixed; bottom:0; left:0;
+    height:2px; background:var(--light-teal);
+    transition:width .3s ease; z-index:1001;
+  }
+
+  /* ── SLIDES ── */
+  .slides-wrap { margin-top:68px; width:100%; max-width:980px; }
+  .slide {
+    display:none; width:100%; aspect-ratio:16/9;
+    border-radius:10px; overflow:hidden;
+    box-shadow:0 24px 64px rgba(0,0,0,0.55);
+    animation:fadeUp .3s cubic-bezier(.22,1,.36,1);
+    position:relative;
+  }
+  .slide.active { display:flex; }
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(10px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  /* ── WATERMARK (reusable) ── */
+  .wm {
+    position:absolute; bottom:2.8%; right:3.5%; opacity:.2;
+  }
+
+  /* ═══════════════════════════
+     SLIDE TYPE: TITLE (blue bg)
+  ═══════════════════════════ */
+  .s-title {
+    background: var(--elastic-blue);
+    flex-direction: column;
+    justify-content: center;
+    padding: 7% 9%;
+  }
+  .s-title .eyebrow {
+    font-family:var(--font-code); font-size:clamp(8px,1vw,11px);
+    font-weight:700; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--light-teal); margin-bottom:2%;
+  }
+  .s-title h1 {
+    font-size:clamp(22px,4vw,48px); font-weight:900;
+    color:white; line-height:1.08; max-width:72%; margin-bottom:3%;
+  }
+  .s-title .sub {
+    font-size:clamp(10px,1.3vw,15px); color:rgba(255,255,255,.7);
+    max-width:58%; line-height:1.55; margin-bottom:5%;
+  }
+  .teal-rule { width:52px; height:3px; background:var(--light-teal); border-radius:2px; margin-bottom:3%; }
+  .s-title .logo-row {
+    position:absolute; bottom:6%; left:9%;
+    display:flex; align-items:center; gap:10px;
+  }
+  .s-title .tagline { font-size:clamp(7px,.85vw,10px); color:rgba(255,255,255,.4); }
+  .deco {
+    position:absolute; right:0; top:0; bottom:0; width:30%;
+    background:rgba(0,0,0,.1);
+    clip-path:polygon(18% 0,100% 0,100% 100%,0% 100%);
+  }
+  .deco-pills {
+    position:absolute; right:3%; top:50%; transform:translateY(-50%);
+    display:flex; flex-direction:column; gap:8px; align-items:flex-end;
+  }
+  .pill {
+    background:rgba(72,239,207,.12); border:1px solid rgba(72,239,207,.35);
+    color:var(--light-teal); font-size:clamp(7px,.8vw,9px);
+    font-family:var(--font-code); padding:3px 9px; border-radius:3px;
+    white-space:nowrap;
+  }
+
+  /* ═══════════════════════════
+     SLIDE TYPE: SECTION (blue)
+  ═══════════════════════════ */
+  .s-section {
+    background:var(--elastic-blue);
+    flex-direction:column; justify-content:center;
+    padding:7% 9%;
+  }
+  .s-section .sec-num {
+    font-family:var(--font-code); font-size:clamp(40px,7vw,80px);
+    font-weight:700; color:rgba(255,255,255,.08); line-height:1;
+  }
+  .s-section h2 {
+    font-size:clamp(18px,3vw,36px); font-weight:800;
+    color:white; line-height:1.15; max-width:68%; margin-bottom:3%;
+  }
+  .s-section .sec-desc {
+    font-size:clamp(9px,1.1vw,13px); color:rgba(255,255,255,.65);
+    max-width:55%; line-height:1.6;
+  }
+  .sec-tag {
+    display:inline-flex; align-items:center; gap:6px;
+    background:rgba(0,0,0,.18); border:1px solid rgba(255,255,255,.12);
+    color:rgba(255,255,255,.75); font-size:clamp(7px,.8vw,9px);
+    font-family:var(--font-code); padding:3px 10px; border-radius:20px;
+    margin-bottom:3%; width:fit-content;
+  }
+  .sec-tag .dot { width:5px; height:5px; border-radius:50%; background:var(--light-teal); }
+
+  /* ═══════════════════════════
+     SLIDE TYPE: CONTENT (white)
+  ═══════════════════════════ */
+  .s-content {
+    background:white;
+    flex-direction:column;
+    padding:5% 6.5%;
+  }
+  .slide-label {
+    font-family:var(--font-code); font-size:clamp(7px,.75vw,8.5px);
+    font-weight:700; letter-spacing:.15em; text-transform:uppercase;
+    color:var(--elastic-blue); margin-bottom:1%;
+  }
+  .s-content h2 {
+    font-size:clamp(14px,2.2vw,26px); font-weight:800;
+    color:var(--dark-ink); line-height:1.2;
+  }
+  .s-content h2 span { color:var(--elastic-blue); }
+  .c-teal-rule { width:44px; height:3px; background:var(--light-teal); border-radius:2px; margin-top:1.5%; margin-bottom:3%; }
+
+  /* cards */
+  .card-grid { display:grid; gap:2%; flex:1; }
+  .g2 { grid-template-columns:1fr 1fr; }
+  .g3 { grid-template-columns:1fr 1fr 1fr; }
+  .g4 { grid-template-columns:1fr 1fr 1fr 1fr; }
+  .card {
+    border:1.5px solid var(--developer-blue); border-radius:8px;
+    background:white; padding:4% 4.5%;
+    display:flex; flex-direction:column; gap:5px;
+  }
+  .card-icon { font-size:clamp(14px,2vw,22px); margin-bottom:2px; }
+  .ct-rule { width:36px; height:2px; background:var(--light-teal); border-radius:1px; margin-bottom:4px; }
+  .card-sub { font-family:var(--font-code); font-size:clamp(7px,.75vw,8.5px); color:var(--elastic-blue); font-weight:600; }
+  .card-title { font-size:clamp(9px,1.1vw,13px); font-weight:700; color:var(--dark-ink); line-height:1.2; }
+  .card-body { font-size:clamp(7.5px,.85vw,10px); color:var(--ink); line-height:1.55; flex:1; }
+
+  /* two-col */
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:3.5%; flex:1; }
+  .col { display:flex; flex-direction:column; gap:2.5%; }
+
+  /* steps */
+  .steps { display:flex; flex-direction:column; gap:2%; flex:1; }
+  .step { display:flex; align-items:flex-start; gap:2.5%; }
+  .snum {
+    width:clamp(18px,2.2vw,26px); height:clamp(18px,2.2vw,26px);
+    border-radius:50%; background:var(--elastic-blue); color:white;
+    font-size:clamp(7px,.9vw,10px); font-weight:700; font-family:var(--font-code);
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; margin-top:1px;
+  }
+  .step-t { font-size:clamp(9px,1.05vw,12px); font-weight:700; color:var(--dark-ink); margin-bottom:2px; }
+  .step-d { font-size:clamp(7.5px,.82vw,9.5px); color:var(--ink); line-height:1.5; }
+
+  /* code blocks */
+  .code {
+    background:var(--developer-blue); border-radius:6px;
+    padding:3.5% 4%; font-family:var(--font-code);
+    font-size:clamp(6.5px,.78vw,9px); color:rgba(255,255,255,.82);
+    line-height:1.75; overflow:hidden; flex:1;
+  }
+  .kw  { color:var(--light-teal); }
+  .str { color:var(--light-poppy); }
+  .num { color:var(--yellow); }
+  .cmt { color:rgba(255,255,255,.35); font-style:italic; }
+  .key { color:rgba(255,255,255,.9); }
+
+  /* highlight boxes */
+  .hl { border-radius:0 6px 6px 0; padding:2.5% 3.5%; }
+  .hl p { font-size:clamp(7.5px,.85vw,10px); color:var(--ink); line-height:1.55; }
+  .hl p strong { color:var(--dark-ink); }
+  .hl-blue { background:rgba(11,100,221,.06); border-left:3px solid var(--elastic-blue); }
+  .hl-teal { background:rgba(72,239,207,.06); border-left:3px solid var(--light-teal); }
+  .hl-yellow { background:rgba(254,197,20,.07); border-left:3px solid var(--yellow); }
+  .hl-poppy  { background:rgba(255,149,125,.06); border-left:3px solid var(--light-poppy); }
+
+  /* tags */
+  .tag { display:inline-block; font-size:clamp(6.5px,.72vw,8.5px); font-family:var(--font-code); padding:2px 6px; border-radius:3px; }
+  .t-blue   { background:rgba(11,100,221,.1);  color:var(--elastic-blue); }
+  .t-teal   { background:rgba(72,239,207,.18); color:#0a8570; }
+  .t-poppy  { background:rgba(255,149,125,.18); color:#b84030; }
+  .t-pink   { background:rgba(240,78,152,.12); color:var(--pink); }
+  .t-yellow { background:rgba(254,197,20,.18); color:#8a6500; }
+
+  /* table */
+  .etable { width:100%; border-collapse:collapse; }
+  .etable th {
+    background:var(--elastic-blue); color:white;
+    font-size:clamp(6.5px,.75vw,8.5px); font-weight:700;
+    text-transform:uppercase; letter-spacing:.08em;
+    padding:1.8% 2%; text-align:left;
+  }
+  .etable td {
+    font-size:clamp(7px,.78vw,9.5px); color:var(--ink);
+    padding:1.6% 2%; border-bottom:1px solid rgba(16,28,63,.1);
+    vertical-align:top; line-height:1.4;
+  }
+  .etable tr:nth-child(even) td { background:var(--light-grey); }
+  .etable td strong { color:var(--dark-ink); }
+  .etable td code { font-family:var(--font-code); font-size:clamp(6px,.72vw,8px); color:var(--elastic-blue); }
+
+  /* stat boxes */
+  .stats { display:flex; gap:2%; margin-bottom:3%; }
+  .stat { background:var(--light-grey); border-radius:7px; padding:3% 4%; flex:1; text-align:center; }
+  .stat-v { font-size:clamp(16px,2.6vw,32px); font-weight:900; color:var(--elastic-blue); font-family:var(--font-code); line-height:1; }
+  .stat-l { font-size:clamp(6.5px,.72vw,8px); text-transform:uppercase; letter-spacing:.08em; font-weight:600; color:var(--ink); margin-top:4px; }
+
+  /* arch boxes */
+  .arch { display:flex; align-items:stretch; gap:1%; flex:1; margin-top:2.5%; }
+  .abox {
+    border:1.5px solid var(--developer-blue); border-radius:7px;
+    background:white; flex:1; padding:3% 3%;
+    display:flex; flex-direction:column; align-items:center;
+    text-align:center; justify-content:center; gap:4px;
+  }
+  .abox-blue { background:var(--elastic-blue); border-color:var(--elastic-blue); }
+  .abox-blue .abox-t, .abox-blue .abox-l { color:white; }
+  .abox-icon { font-size:clamp(16px,2.2vw,26px); }
+  .abox-t { font-size:clamp(7.5px,.9vw,11px); font-weight:700; color:var(--dark-ink); line-height:1.2; }
+  .abox-l { font-size:clamp(6.5px,.72vw,8px); font-family:var(--font-code); color:var(--ink); }
+  .arr { font-size:clamp(10px,1.2vw,15px); color:var(--elastic-blue); flex-shrink:0; align-self:center; }
+
+  /* closing */
+  .s-closing {
+    background:var(--elastic-blue);
+    flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:7%;
+  }
+  .s-closing h2 {
+    font-size:clamp(20px,3.8vw,44px); font-weight:900;
+    color:white; margin:3% 0 2%; line-height:1.1;
+  }
+  .s-closing p {
+    font-size:clamp(9px,1.15vw,13px); color:rgba(255,255,255,.68);
+    max-width:58%; line-height:1.6; margin-bottom:3%;
+  }
+  .s-closing .tagline { font-size:clamp(7px,.8vw,9px); color:rgba(255,255,255,.38); margin-top:5px; letter-spacing:.05em; }
+
+  /* thumb strip */
+  .thumbs {
+    max-width:980px; width:100%;
+    display:flex; gap:5px; margin-top:10px;
+    overflow-x:auto; padding-bottom:4px;
+  }
+  .thumb {
+    width:68px; height:42px; border-radius:4px; overflow:hidden;
+    cursor:pointer; flex-shrink:0;
+    border:2px solid transparent; transition:border-color .15s;
+    position:relative;
+  }
+  .thumb.active { border-color:var(--light-teal); }
+  .thumb:hover  { border-color:rgba(72,239,207,.45); }
+  .thumb-inner { width:100%; height:100%; }
+  .tn { position:absolute; bottom:2px; right:3px; font-size:7px; font-family:var(--font-code); }
+  .tn-w { color:rgba(0,0,0,.3); }
+  .tn-d { color:rgba(255,255,255,.55); }
+
+  /* TOC */
+  .toc-overlay {
+    display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,.72); z-index:900;
+    align-items:center; justify-content:center;
+  }
+  .toc-overlay.open { display:flex; }
+  .toc-panel {
+    background:var(--developer-blue);
+    border:1px solid rgba(72,239,207,.18);
+    border-radius:10px; padding:28px 32px;
+    width:460px; max-height:82vh; overflow-y:auto;
+  }
+  .toc-head {
+    color:white; font-size:15px; font-weight:700;
+    display:flex; justify-content:space-between; align-items:center;
+    margin-bottom:18px;
+  }
+  .toc-x { background:none; border:none; color:rgba(255,255,255,.4); cursor:pointer; font-size:17px; }
+  .toc-sec { font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:rgba(72,239,207,.55); font-weight:600; font-family:var(--font-code); margin:12px 0 3px 8px; }
+  .toc-item { display:flex; align-items:center; gap:10px; padding:7px 9px; border-radius:5px; cursor:pointer; transition:background .12s; }
+  .toc-item:hover { background:rgba(255,255,255,.05); }
+  .toc-n { font-family:var(--font-code); font-size:9px; color:var(--light-teal); width:22px; flex-shrink:0; }
+  .toc-t { font-size:12px; color:rgba(255,255,255,.78); }
+  .toc-type { margin-left:auto; font-size:8px; font-family:var(--font-code); color:rgba(255,255,255,.25); }
+
+  .kb { margin-top:7px; font-size:9px; font-family:var(--font-code); color:rgba(255,255,255,.2); text-align:center; }
+  kbd { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); border-radius:3px; padding:1px 5px; font-size:8px; }
+
+  /* inline code */
+  ic { font-family:var(--font-code); font-size:.85em; color:var(--elastic-blue); }
+  ic.w { color:rgba(255,255,255,.7); }
+
+  /* Elastic wordmark SVG helper */
+  .emark { display:inline-block; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-brand">
+    <svg width="74" height="20" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/>
+      <rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/>
+      <rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/>
+      <rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/>
+      <text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="white">elastic</text>
+    </svg>
+    <span class="nav-tag">Classification Workshop</span>
+  </div>
+  <div class="nav-right">
+    <button class="toc-btn" onclick="toggleTOC()">Contents</button>
+    <button class="nav-btn" id="prevBtn" onclick="go(-1)">&#8592;</button>
+    <span class="nav-counter" id="ctr">1 / 22</span>
+    <button class="nav-btn" id="nextBtn" onclick="go(1)">&#8594;</button>
+  </div>
+</nav>
+<div class="progress" id="prog"></div>
+
+<!-- TOC -->
+<div class="toc-overlay" id="toc" onclick="closeTOCOut(event)">
+  <div class="toc-panel">
+    <div class="toc-head">Slide Contents <button class="toc-x" onclick="toggleTOC()">✕</button></div>
+    <div id="tocList"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     SLIDES
+════════════════════════════════════════ -->
+<div class="slides-wrap">
+
+<!-- ╔═══╗ SLIDE 1 — TITLE ╚═══╝ -->
+<div class="slide s-title active" data-title="LendPath ML Classification Workshop" data-type="title">
+  <div class="deco">
+    <div class="deco-pills">
+      <div class="pill">Chapter 0 — Setup</div>
+      <div class="pill">Chapter 1 — Classification</div>
+      <div class="pill">Chapter 2 — Agent + Workflow</div>
+      <div class="pill">Chapter 3 — Take-Aways</div>
+    </div>
+  </div>
+  <div class="eyebrow">Elastic Machine Learning — Data Frame Analytics</div>
+  <div class="teal-rule"></div>
+  <h1>LendPath ML<br>Classification Workshop</h1>
+  <div class="sub">Learn how a fictional mortgage lender's data tells a story of risk — and how Elastic ML turns that story into real-time predictions, AI-assisted analysis, and fully automated model creation.</div>
+  <div class="logo-row">
+    <svg width="68" height="19" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="70" height="82" rx="8" fill="rgba(255,255,255,.28)"/>
+      <rect x="12" y="16" width="46" height="11" rx="2" fill="white"/>
+      <rect x="12" y="35" width="36" height="11" rx="2" fill="rgba(255,255,255,.72)"/>
+      <rect x="12" y="55" width="46" height="11" rx="2" fill="rgba(255,255,255,.88)"/>
+      <text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="white">elastic</text>
+    </svg>
+    <span class="tagline">The Search AI Company</span>
+  </div>
+</div>
+
+<!-- ╔═══╗ SLIDE 2 — WHAT YOU'LL BUILD ╚═══╝ -->
+<div class="slide s-content" data-title="What You'll Build" data-type="content">
+  <div class="slide-label">Overview</div>
+  <h2>What You'll <span>Build</span></h2>
+  <div class="c-teal-rule"></div>
+  <div class="card-grid g2" style="flex:1">
+    <div class="card">
+      <div class="card-icon">🏗️</div>
+      <div class="ct-rule"></div>
+      <div class="card-sub">Chapter 1 — Manual</div>
+      <div class="card-title">Build, Train & Deploy a Classification Job</div>
+      <div class="card-body">Create <ic>mortgage-privileged-access-classification</ic> from scratch. Explore the Kibana wizard, recreate via Dev Tools with full excludes + hyperparameters, evaluate results, deploy as an ingest pipeline, and observe live predictions in Discover.</div>
+      <div style="margin-top:auto;padding-top:6px"><span class="tag t-blue">PingOne IAM</span> <span class="tag t-teal">Oracle DB</span> <span class="tag t-poppy">3 classes</span></div>
+    </div>
+    <div class="card">
+      <div class="card-icon">🤖</div>
+      <div class="ct-rule"></div>
+      <div class="card-sub">Chapter 2 — Automated</div>
+      <div class="card-title">AI Agent + Workflow Automation</div>
+      <div class="card-body">Build an ML Readiness Analyst agent to discover data, assess class balance, and analyze features. Then wire an Elastic Workflow that automatically creates and starts <ic>mortgage-audit-classification</ic> end-to-end.</div>
+      <div style="margin-top:auto;padding-top:6px"><span class="tag t-blue">Agent Builder</span> <span class="tag t-pink">Workflows</span> <span class="tag t-yellow">Audit logs</span></div>
+    </div>
+  </div>
+  <div class="wm"><svg width="52" height="14" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/><rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/><rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/><rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/><text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="#1C1E23">elastic</text></svg></div>
+</div>
+
+<!-- ╔═══╗ SLIDE 3 — DATA SOURCES ╚═══╝ -->
+<div class="slide s-content" data-title="The Three Data Streams" data-type="content">
+  <div class="slide-label">Architecture</div>
+  <h2>Three Data Streams, <span>Two Classification Jobs</span></h2>
+  <div class="c-teal-rule"></div>
+  <table class="etable" style="flex:1">
+    <thead>
+      <tr><th>Data Stream</th><th>Source</th><th>Label Field</th><th>Used In</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>logs-ping_one.audit-mortgage</code></td>
+        <td>PingOne IAM events</td>
+        <td><strong>ping_one.audit.risk.level</strong> — LOW / MEDIUM / HIGH</td>
+        <td><span class="tag t-blue">Chapter 1</span></td>
+      </tr>
+      <tr>
+        <td><code>logs-oracle.database_audit-mortgage</code></td>
+        <td>Oracle DB audit events</td>
+        <td><em>No label</em> — provides cross-source features</td>
+        <td><span class="tag t-blue">Chapter 1</span></td>
+      </tr>
+      <tr>
+        <td><code>logs-mortgage.audit-default</code></td>
+        <td>Internal LendPath audit log</td>
+        <td><strong>audit.is_suspicious</strong> — boolean</td>
+        <td><span class="tag t-pink">Chapter 2</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <div style="margin-top:2.5%">
+    <div class="hl hl-teal"><p><strong>Key insight:</strong> Chapter 1 trains a single model on two sources simultaneously. Oracle documents have null PingOne fields — DFA handles this naturally, treating missing fields as absent features rather than errors. The model learns risk patterns across both systems at once.</p></div>
+  </div>
+  <div class="wm"><svg width="52" height="14" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/><rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/><rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/><rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/><text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="#1C1E23">elastic</text></svg></div>
+</div>
+
+<!-- ╔═══╗ SLIDE 4 — SETUP SECTION ╚═══╝ -->
+<div class="slide s-section" data-title="Chapter 0 — Setup" data-type="section">
+  <div class="sec-tag"><span class="dot"></span>Chapter 0</div>
+  <div class="sec-num">00</div>
+  <div class="teal-rule"></div>
+  <h2>Setup &amp; Environment Review</h2>
+  <div class="sec-desc">Spin up the Instruqt cluster, run bootstrap to create index templates and data streams, then backfill 30 days of synthetic LendPath data. Verify data in Discover before proceeding.</div>
+</div>
+
+<!-- ╔═══╗ SLIDE 5 — SETUP STEPS ╚═══╝ -->
+<div class="slide s-content" data-title="Chapter 0: Setup Steps" data-type="content">
+  <div class="slide-label">Chapter 0 — Setup</div>
+  <h2>Environment <span>Setup</span></h2>
+  <div class="c-teal-rule"></div>
+  <div class="two-col" style="flex:1">
+    <div class="col">
+      <div class="steps">
+        <div class="step">
+          <div class="snum">1</div>
+          <div>
+            <div class="step-t">Cluster configuration</div>
+            <div class="step-d">Run the cluster-config script to configure Elasticsearch, Kibana settings, and enable required features (Agent Builder, Workflows).</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="snum">2</div>
+          <div>
+            <div class="step-t">Bootstrap</div>
+            <div class="step-d">Creates index templates with cross-index consistent field mappings, data streams, patches existing backing index mappings, and creates Kibana data views.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="snum">3</div>
+          <div>
+            <div class="step-t">Backfill 30 days of data</div>
+            <div class="step-d">Generates synthetic data across all three streams with realistic diurnal patterns, business calendar, and correlated anomaly signals.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="snum">4</div>
+          <div>
+            <div class="step-t">Verify in Discover</div>
+            <div class="step-d">Confirm all three data views are present, documents are flowing, and the time picker shows 30 days of coverage with expected peak/off-hours patterns.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="code" style="flex:0 0 auto">
+        <span class="cmt"># Terminal 1 — cluster config</span><br>
+        git clone https://github.com/iamhowardtheduck/<br>
+        &nbsp;&nbsp;elastic-ml-lifecycle-automation.git &amp;&amp;<br>
+        bash /root/elastic-ml-lifecycle-automation/<br>
+        &nbsp;&nbsp;Scripts/cluster-config.sh<br><br>
+        <span class="cmt"># Terminal 2 — bootstrap + backfill</span><br>
+        bash /workspace/workshop/<br>
+        &nbsp;&nbsp;elastic-ml-lifecycle-automation/<br>
+        &nbsp;&nbsp;Scripts/bootstrap.sh<br><br>
+        bash /workspace/workshop/<br>
+        &nbsp;&nbsp;elastic-ml-lifecycle-automation/<br>
+        &nbsp;&nbsp;Scripts/backfill.sh
+      </div>
+      <div class="hl hl-yellow" style="margin-top:0">
+        <p><strong>Prerequisite:</strong> Elastic Stack 9.2+ or Serverless. Workflows and Agent Builder must be enabled in Advanced Settings. An LLM connector (OpenAI, Azure, Bedrock, or local) is required for Chapter 2.</p>
+      </div>
+    </div>
+  </div>
+  <div class="wm"><svg width="52" height="14" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/><rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/><rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/><rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/><text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="#1C1E23">elastic</text></svg></div>
+</div>
+
+<!-- ╔═══╗ SLIDE 6 — CHAPTER 1 SECTION ╚═══╝ -->
+<div class="slide s-section" data-title="Chapter 1 — Classification Job" data-type="section">
+  <div class="sec-tag"><span class="dot"></span>Chapter 1</div>
+  <div class="sec-num">01</div>
+  <div class="teal-rule"></div>
+  <h2>Build &amp; Train a<br>Classification Job</h2>
+  <div class="sec-desc">Create, train, and deploy the <ic class="w">mortgage-privileged-access-classification</ic> job — predict whether a privileged access event is LOW, MEDIUM, or HIGH risk by learning from PingOne IAM and Oracle DB audit events simultaneously.</div>
+</div>
+
+<!-- ╔═══╗ SLIDE 7 — 1.1 EXPLORE DATA ╚═══╝ -->
+<div class="slide s-content" data-title="1.1 — Explore Source Data" data-type="content">
+  <div class="slide-label">Chapter 1 — Step 1.1</div>
+  <h2>Explore the <span>Source Data</span></h2>
+  <div class="c-teal-rule"></div>
+  <div class="two-col" style="flex:1">
+    <div class="col">
+      <div class="card">
+        <div class="ct-rule"></div>
+        <div class="card-sub">logs-ping_one.audit-mortgage</div>
+        <div class="card-title">PingOne IAM Audit Events</div>
+        <div class="card-body">
+          Add columns:<br>
+          • <ic>ping_one.audit.risk.level</ic> — <strong>the label</strong> (LOW/MED/HIGH)<br>
+          • <ic>ping_one.audit.risk.score</ic> — numeric 0–100<br>
+          • <ic>ping_one.audit.action.type</ic> — IAM action<br>
+          • <ic>ping_one.audit.result.status</ic> — SUCCESS/FAILED/BLOCKED<br>
+          • <ic>event.outcome</ic> — success/failure<br><br>
+          Notice: LOW events dominate, HIGH events are rare — this is the class imbalance the <strong>maximize_minimum_recall</strong> objective addresses.
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct-rule"></div>
+        <div class="card-sub">logs-oracle.database_audit-mortgage</div>
+        <div class="card-title">Oracle DB Audit Events</div>
+        <div class="card-body">
+          Add columns:<br>
+          • <ic>oracle.database_audit.action</ic> — SELECT, DROP TABLE, GRANT<br>
+          • <ic>oracle.database_audit.privilege</ic> — SYSDBA, DBA, NOT APPLICABLE<br>
+          • <ic>event.outcome</ic> — success/failure<br><br>
+          Notice: <strong>No PingOne fields present</strong> — DFA handles null features naturally.
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="hl hl-blue">
+        <p><strong>Discussion:</strong> Why train one model on both sources rather than two separate models?</p>
+      </div>
+      <div class="hl hl-teal" style="margin-top:0">
+        <p>A single cross-source model sees the full feature space. It learns that <strong>SYSDBA privilege escalation in Oracle</strong> carries the same risk signature as <strong>USER.MFA.BYPASS in PingOne</strong> — because both co-occurred with HIGH risk labels in training. Two separate models only see half the picture each.</p>
+      </div>
+      <div class="hl hl-blue" style="margin-top:0">
+        <p><strong>Set time picker to Last 30 days</strong> before exploring. The data generator has embedded diurnal patterns — you should see peaks at 10:00–12:00 local time and near-zero volume overnight.</p>
+      </div>
+    </div>
+  </div>
+  <div class="wm"><svg width="52" height="14" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/><rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/><rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/><rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/><text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="#1C1E23">elastic</text></svg></div>
+</div>
+
+<!-- ╔═══╗ SLIDE 8 — 1.2 CLASS BALANCE ╚═══╝ -->
+<div class="slide s-content" data-title="1.2 — Check Class Balance" data-type="content">
+  <div class="slide-label">Chapter 1 — Step 1.2</div>
+  <h2>Check <span>Class Balance</span> with ES|QL</h2>
+  <div class="c-teal-rule"></div>
+  <div class="two-col" style="flex:1">
+    <div class="col">
+      <div class="code">
+        <span class="cmt">-- Class distribution: PingOne source</span><br>
+        <span class="kw">FROM</span> logs-ping_one.audit-mortgage<br>
+        <span class="kw">| WHERE</span> @timestamp <span class="kw">&gt;</span> <span class="str">NOW() - 30 days</span><br>
+        <span class="kw">| STATS</span> doc_count <span class="kw">=</span> <span class="num">COUNT</span>(*)<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BY ping_one.audit.risk.level<br>
+        <span class="kw">| SORT</span> doc_count <span class="kw">DESC</span>
+      </div>
+      <div class="code" style="margin-top:0">
+        <span class="cmt">-- Verify Oracle source + high-risk signals</span><br>
+        <span class="kw">FROM</span> logs-oracle.database_audit-mortgage<br>
+        <span class="kw">| WHERE</span> @timestamp <span class="kw">&gt;</span> <span class="str">NOW() - 30 days</span><br>
+        <span class="kw">| STATS</span><br>
+        &nbsp;&nbsp;total &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= <span class="num">COUNT</span>(*),<br>
+        &nbsp;&nbsp;sysdba_count = <span class="num">SUM</span>(<span class="kw">CASE</span>(privilege ==<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"SYSDBA"</span>, <span class="num">1</span>, <span class="num">0</span>)),<br>
+        &nbsp;&nbsp;drop_count &nbsp;&nbsp;= <span class="num">SUM</span>(<span class="kw">CASE</span>(action ==<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"DROP TABLE"</span>, <span class="num">1</span>, <span class="num">0</span>))
+      </div>
+    </div>
+    <div class="col">
+      <div class="hl hl-blue">
+        <p><strong>What you expect to see:</strong> Three rows — LOW dominating, MEDIUM moderate, HIGH rarest. You need several hundred in each class for reliable training.</p>
+      </div>
+      <div class="hl hl-teal" style="margin-top:0">
+        <p><strong>ES|QL tip:</strong> <ic>COUNT(field)</ic> counts non-null rows — it does NOT filter on a condition. Use <ic>SUM(CASE(condition, 1, 0))</ic> to count rows matching a condition. The workshop queries use this pattern throughout.</p>
+      </div>
+      <div class="hl hl-yellow" style="margin-top:0">
+        <p><strong>Why this matters:</strong> If HIGH is very sparse, the <ic>maximize_minimum_recall</ic> objective you'll set in Step 1.3 specifically penalises the model for missing rare classes — it's the right choice for imbalanced security data.</p>
+      </div>
+    </div>
+  </div>
+  <div class="wm"><svg width="52" height="14" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/><rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/><rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/><rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/><text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="#1C1E23">elastic</text></svg></div>
+</div>
+
+<!-- ╔═══╗ SLIDE 9 — 1.3 CREATE JOB (WIZARD) ╚═══╝ -->
+<div class="slide s-content" data-title="1.3 — Create Job via Wizard (Part A)" data-type="content">
+  <div class="slide-label">Chapter 1 — Step 1.3 Part A</div>
+  <h2>Explore the Kibana <span>DFA Wizard</span></h2>
+  <div class="c-teal-rule"></div>
+  <div class="two-col" style="flex:1">
+    <div class="col">
+      <div class="steps">
+        <div class="step">
+          <div class="snum">1</div>
+          <div>
+            <div class="step-t">Navigate → Data Frame Analytics</div>
+            <div class="step-d">Search <ic>data frame analytics</ic> in the top bar. Click <strong>Create Data Frame Analytics Job</strong>.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="snum">2</div>
+          <div>
+            <div class="step-t">Create a multi-index data view</div>
+            <div class="step-d">Create data view with index pattern <ic>logs-ping_one.audit-mortgage*,logs-oracle.database_audit-mortgage*</ic>. Name it <ic>logs-mortgage-privileged-access-classification</ic>.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="snum">3</div>
+          <div>
+            <div class="step-t">Select Classification, set dependent variable</div>
+            <div class="step-d">Job type = <strong>Classification</strong>. Dependent variable = <ic>ping_one.audit.risk.level</ic>. Expand Hyperparameters — note <ic>maximize_minimum_recall</ic> option.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="snum">4</div>
+          <div>
+            <div class="step-t">Observe the Analyzed Fields limitation</div>
+            <div class="step-d">Step back to view Analyzed Fields. Note: the UI only offers an <strong>Includes</strong> picker — no <strong>Excludes</strong> field. This is why we use Dev Tools for the final job.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="snum">5</div>
+          <div>
+            <div class="step-t">Create job (do NOT start immediately)</div>
+            <div class="step-d">Set Job ID = <ic>mortgage-privileged-access-classification</ic>. <strong>Disable "Start immediately"</strong> before pressing Create.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="hl hl-poppy">
+        <p><strong>⚠ Important:</strong> Disable the <ic>Start immediately</ic> toggle before pressing Create. You'll update the job definition via Dev Tools before starting it.</p>
+      </div>
+      <div class="hl hl-blue" style="margin-top:0">
+        <p><strong>Why the wizard first?</strong> It generates the base JSON structure — source indices, dependent variable, training_percent — which you retrieve and extend via Dev Tools rather than writing from scratch.</p>
+      </div>
+      <div class="hl hl-teal" style="margin-top:0">
+        <p><strong>The key gap:</strong> Without an <ic>excludes</ic> list, DFA would analyze <ic>@timestamp</ic>, <ic>user.id</ic>, and <ic>user.name</ic>. The model would memorize <em>when</em> events happen and <em>who</em> performed them — not the behavioral patterns that signal genuine risk.</p>
+      </div>
+    </div>
+  </div>
+  <div class="wm"><svg width="52" height="14" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/><rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/><rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/><rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/><text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="#1C1E23">elastic</text></svg></div>
+</div>
+
+<!-- ╔═══╗ SLIDE 10 — 1.3 CREATE JOB (DEV TOOLS) ╚═══╝ -->
+<div class="slide s-content" data-title="1.3 — Recreate via Dev Tools (Part B)" data-type="content">
+  <div class="slide-label">Chapter 1 — Step 1.3 Part B</div>
+  <h2>Recreate with <span>Excludes + Hyperparameters</span></h2>
+  <div class="c-teal-rule"></div>
+  <div class="two-col" style="flex:1">
+    <div class="col">
+      <div class="code" style="font-size:clamp(6px,.72vw,8.5px)">
+        <span class="cmt"># First — retrieve what the wizard created</span><br>
+        <span class="kw">GET</span> _ml/data_frame/analytics/<br>
+        &nbsp;&nbsp;mortgage-privileged-access-classification<br><br>
+        <span class="cmt"># Delete the wizard job</span><br>
+        <span class="kw">DELETE</span> _ml/data_frame/analytics/<br>
+        &nbsp;&nbsp;mortgage-privileged-access-classification<br><br>
+        <span class="cmt"># Recreate with correct configuration</span><br>
+        <span class="kw">PUT</span> _ml/data_frame/analytics/<br>
+        &nbsp;&nbsp;mortgage-privileged-access-classification<br>
+        {<br>
+        &nbsp;<span class="str">"source"</span>: { <span class="str">"index"</span>: [<span class="str">"logs-ping_one.audit-mortgage"</span>,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"logs-oracle.database_audit-mortgage"</span>] },<br>
+        &nbsp;<span class="str">"dest"</span>: { <span class="str">"index"</span>: <span class="str">"mortgage-privileged-access-classification"</span>,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"results_field"</span>: <span class="str">"ml"</span> },<br>
+        &nbsp;<span class="str">"analysis"</span>: { <span class="str">"classification"</span>: {<br>
+        &nbsp;&nbsp;&nbsp;<span class="str">"dependent_variable"</span>: <span class="str">"ping_one.audit.risk.level"</span>,<br>
+        &nbsp;&nbsp;&nbsp;<span class="str">"training_percent"</span>: <span class="num">80</span>, <span class="str">"num_top_classes"</span>: <span class="num">3</span>,<br>
+        &nbsp;&nbsp;&nbsp;<span class="str">"prediction_field_name"</span>: <span class="str">"risk_level_prediction"</span>,<br>
+        &nbsp;&nbsp;&nbsp;<span class="str">"num_top_feature_importance_values"</span>: <span class="num">5</span>,<br>
+        &nbsp;&nbsp;&nbsp;<span class="str">"class_assignment_objective"</span>: <span class="str">"maximize_minimum_recall"</span>,<br>
+        &nbsp;&nbsp;&nbsp;<span class="str">"lambda"</span>: <span class="num">0.1</span>, <span class="str">"gamma"</span>: <span class="num">0.1</span>,<br>
+        &nbsp;&nbsp;&nbsp;<span class="str">"eta"</span>: <span class="num">0.1</span>, <span class="str">"feature_bag_fraction"</span>: <span class="num">0.5</span> }},<br>
+        &nbsp;<span class="str">"analyzed_fields"</span>: {<br>
+        &nbsp;&nbsp;&nbsp;<span class="str">"includes"</span>: [<span class="str">"ping_one.audit.risk.score"</span>,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"ping_one.audit.risk.level"</span>, <span class="str">"ping_one.audit.action.type"</span>,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"ping_one.audit.result.status"</span>,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"oracle.database_audit.action"</span>,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"oracle.database_audit.privilege"</span>, <span class="str">"event.outcome"</span>],<br>
+        &nbsp;&nbsp;&nbsp;<span class="str">"excludes"</span>: [<span class="str">"@timestamp"</span>, <span class="str">"user.id"</span>, <span class="str">"user.name"</span>] },<br>
+        &nbsp;<span class="str">"model_memory_limit"</span>: <span class="str">"550mb"</span><br>
+        }
+      </div>
+    </div>
+    <div class="col">
+      <div class="hl hl-teal">
+        <p><strong>3 changes from the wizard:</strong></p>
+      </div>
+      <div class="card" style="margin-top:0">
+        <div class="ct-rule"></div>
+        <div class="card-title">① analyzed_fields.excludes populated</div>
+        <div class="card-body"><ic>@timestamp</ic>, <ic>user.id</ic>, <ic>user.name</ic> stripped from analysis. Prevents the model from learning time-based or identity-based patterns instead of behavioral risk signals.</div>
+      </div>
+      <div class="card" style="margin-top:0">
+        <div class="ct-rule"></div>
+        <div class="card-title">② Hyperparameters added as flat fields</div>
+        <div class="card-body"><ic>lambda</ic>, <ic>gamma</ic>, <ic>eta</ic>, <ic>feature_bag_fraction</ic> are siblings of <ic>dependent_variable</ic> — not nested under a <ic>"hyperparameters"</ic> key (the API rejects that).</div>
+      </div>
+      <div class="card" style="margin-top:0">
+        <div class="ct-rule"></div>
+        <div class="card-title">③ Tight includes list</div>
+        <div class="card-body">Only the 7 fields that carry genuine risk signal. Keeps the feature space clean and destination index lean.</div>
+      </div>
+    </div>
+  </div>
+  <div class="wm"><svg width="52" height="14" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/><rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/><rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/><rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/><text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="#1C1E23">elastic</text></svg></div>
+</div>
+
+<!-- ╔═══╗ SLIDE 11 — INCLUDES/EXCLUDES TABLE ╚═══╝ -->
+<div class="slide s-content" data-title="Analyzed Fields: Why Each Field" data-type="content">
+  <div class="slide-label">Chapter 1 — Step 1.3</div>
+  <h2>Why Each <span>Analyzed Field</span></h2>
+  <div class="c-teal-rule"></div>
+  <table class="etable" style="flex:1">
+    <thead><tr><th>Field</th><th>Role</th><th>Reason</th></tr></thead>
+    <tbody>
+      <tr><td><code>ping_one.audit.risk.score</code></td><td><span class="tag t-teal">Feature</span></td><td>Numeric 0–100 IAM risk signal — strongest single predictor</td></tr>
+      <tr><td><code>ping_one.audit.risk.level</code></td><td><span class="tag t-blue">Dependent variable</span></td><td>The label the model learns to predict: LOW / MEDIUM / HIGH</td></tr>
+      <tr><td><code>ping_one.audit.action.type</code></td><td><span class="tag t-teal">Feature</span></td><td>IAM action category — AUTHENTICATION, MFA, ADMIN</td></tr>
+      <tr><td><code>ping_one.audit.result.status</code></td><td><span class="tag t-teal">Feature</span></td><td>SUCCESS, FAILED, BLOCKED — strong failure signal</td></tr>
+      <tr><td><code>oracle.database_audit.action</code></td><td><span class="tag t-teal">Feature</span></td><td>SQL action — DROP TABLE, GRANT, SELECT</td></tr>
+      <tr><td><code>oracle.database_audit.privilege</code></td><td><span class="tag t-teal">Feature</span></td><td>SYSDBA, DBA, NOT APPLICABLE — privilege level</td></tr>
+      <tr><td><code>event.outcome</code></td><td><span class="tag t-teal">Feature</span></td><td>Cross-source success/failure signal in both sources</td></tr>
+      <tr><td><code>@timestamp</code></td><td><span class="tag t-poppy">Excluded</span></td><td>Time must never be a feature — model would learn <em>when</em>, not <em>why</em></td></tr>
+      <tr><td><code>user.id</code></td><td><span class="tag t-poppy">Excluded</span></td><td>Individual identity must never be a feature — would memorize specific users</td></tr>
+      <tr><td><code>user.name</code></td><td><span class="tag t-poppy">Excluded</span></td><td>Same reason as user.id — behavioral patterns, not identity patterns</td></tr>
+    </tbody>
+  </table>
+  <div class="wm"><svg width="52" height="14" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/><rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/><rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/><rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/><text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="#1C1E23">elastic</text></svg></div>
+</div>
+
+<!-- ╔═══╗ SLIDE 12 — 1.4 TRAINING PHASES ╚═══╝ -->
+<div class="slide s-content" data-title="1.4 — Start & Monitor Training" data-type="content">
+  <div class="slide-label">Chapter 1 — Step 1.4</div>
+  <h2>Start the Job &amp; <span>Monitor Training</span></h2>
+  <div class="c-teal-rule"></div>
+  <div class="two-col" style="flex:1">
+    <div class="col">
+      <div class="hl hl-blue" style="margin-bottom:2%">
+        <p>Navigate to <strong>Data Frame Analytics → Jobs</strong>. Click ▶ <strong>Start</strong> on the <ic>mortgage-privileged-access-classification</ic> row. Press Refresh to watch phases advance.</p>
+      </div>
+      <table class="etable">
+        <thead><tr><th>Phase</th><th>What Happens</th></tr></thead>
+        <tbody>
+          <tr><td><strong>reindexing</strong></td><td>All documents from both sources copied to destination index</td></tr>
+          <tr><td><strong>loading_data</strong></td><td>Features extracted and prepared for boosted tree algorithm</td></tr>
+          <tr><td><strong>feature_selection</strong></td><td>Zero-variance fields dropped before training</td></tr>
+          <tr><td><strong>coarse_parameter_search</strong></td><td>Bayesian search over hyperparameter space — <em>slowest phase</em></td></tr>
+          <tr><td><strong>fine_tuning_parameters</strong></td><td>Coarse candidates narrowed to final values</td></tr>
+          <tr><td><strong>final_training</strong></td><td>Model trained on 80% of data; hyperparameters locked</td></tr>
+          <tr><td><strong>writing_results</strong></td><td>Predictions written to held-out 20% test set</td></tr>
+          <tr><td><strong>inference</strong></td><td>Precision, recall, confusion matrix computed</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="col">
+      <div class="hl hl-teal">
+        <p><strong>Training time:</strong> 3–8 minutes depending on document count and cluster size. Watch the progress bar in Data Frame Analytics → Jobs.</p>
+      </div>
+      <div class="hl hl-blue" style="margin-top:0">
+        <p><strong>While it trains — discuss:</strong> DFA is learning on a dataset where roughly half the documents have null PingOne fields and half have null Oracle fields. The model learns that SYSDBA privilege + failed outcome from Oracle carries the same HIGH-risk signature as USER.MFA.BYPASS from PingOne — cross-source pattern recognition that rule-based systems cannot do.</p>
+      </div>
+      <div class="hl hl-yellow" style="margin-top:0">
+        <p><strong>After completion:</strong> Click <strong>Synchronize your jobs and trained models</strong> before exploring results. This syncs the trained model with Kibana's model registry.</p>
+      </div>
+    </div>
+  </div>
+  <div class="wm"><svg width="52" height="14" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/><rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/><rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/><rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/><text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="#1C1E23">elastic</text></svg></div>
+</div>
+
+<!-- ╔═══╗ SLIDE 13 — 1.5 RESULTS ╚═══╝ -->
+<div class="slide s-content" data-title="1.5 — Explore Training Results" data-type="content">
+  <div class="slide-label">Chapter 1 — Step 1.5</div>
+  <h2>Explore <span>Training Results</span></h2>
+  <div class="c-teal-rule"></div>
+  <div class="two-col" style="flex:1">
+    <div class="col">
+      <div class="card">
+        <div class="ct-rule"></div>
+        <div class="card-title">Confusion Matrix</div>
+        <div class="card-body">
+          Click <strong>Explore results</strong> on the completed job. Look for:<br><br>
+          • <strong>HIGH recall</strong> — what % of actual HIGH events predicted correctly? Because you used <ic>maximize_minimum_recall</ic> this should be strongest.<br>
+          • <strong>LOW precision</strong> — how many LOW predictions were actually LOW?<br>
+          • Any systematic MEDIUM↔HIGH misclassification?
+        </div>
+      </div>
+      <div class="card" style="margin-top:0">
+        <div class="ct-rule"></div>
+        <div class="card-title">Feature Importance</div>
+        <div class="card-body">
+          Click any document in the results table. The Feature Importance panel shows which fields drove that specific prediction.<br><br>
+          For a HIGH-risk document you should see <ic>ping_one.audit.risk.score</ic> or <ic>oracle.database_audit.privilege</ic> near the top.<br><br>
+          <strong>Discussion:</strong> Feature importance answers <em>why</em> the model predicted — not just <em>what</em>. In mortgage compliance, showing an auditor why a transaction was flagged is as important as flagging it correctly.
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="code" style="font-size:clamp(6px,.72vw,8.5px)">
+        <span class="cmt"># Read final hyperparameters after training</span><br>
+        <span class="kw">GET</span> _ml/data_frame/analytics/<br>
+        &nbsp;&nbsp;mortgage-privileged-access-classification/_stats<br><br>
+        <span class="cmt"># Look for analysis_stats.classification_stats</span><br>
+        <span class="cmt"># .hyperparameters in the response:</span><br>
+        {<br>
+        &nbsp;<span class="str">"hyperparameters"</span>: {<br>
+        &nbsp;&nbsp;<span class="str">"class_assignment_objective"</span>: <span class="str">"maximize_minimum_recall"</span>,<br>
+        &nbsp;&nbsp;<span class="str">"alpha"</span>: <span class="num">0.84</span>,<br>
+        &nbsp;&nbsp;<span class="str">"downsample_factor"</span>: <span class="num">0.91</span>,<br>
+        &nbsp;&nbsp;<span class="str">"eta"</span>: <span class="num">0.1</span>,<br>
+        &nbsp;&nbsp;<span class="str">"eta_growth_rate"</span>: <span class="num">1.02</span>,<br>
+        &nbsp;&nbsp;<span class="str">"feature_bag_fraction"</span>: <span class="num">0.5</span>,<br>
+        &nbsp;&nbsp;<span class="str">"gamma"</span>: <span class="num">0.1</span>,<br>
+        &nbsp;&nbsp;<span class="str">"lambda"</span>: <span class="num">0.1</span>,<br>
+        &nbsp;&nbsp;<span class="str">"max_trees"</span>: <span class="num">894</span>,<br>
+        &nbsp;&nbsp;<span class="str">"soft_tree_depth_limit"</span>: <span class="num">3.05</span><br>
+        &nbsp;}
+        }
+      </div>
+      <div class="hl hl-teal" style="margin-top:0">
+        <p><strong>What auto-tuned values tell you:</strong> <ic>downsample_factor: 0.91</ic> → dataset large enough for near-full gradients. <ic>max_trees: 894</ic> → model used all allocated trees. <ic>soft_tree_depth_limit: 3.05</ic> → shallow trees, simple risk patterns. The optimizer agreed with your manual regularization choices.</p>
+      </div>
+    </div>
+  </div>
+  <div class="wm"><svg width="52" height="14" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/><rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/><rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/><rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/><text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="#1C1E23">elastic</text></svg></div>
+</div>
+
+<!-- ╔═══╗ SLIDE 14 — 1.6 CONFIRM MODEL ╚═══╝ -->
+<div class="slide s-content" data-title="1.6 & 1.7 — Confirm Model & Deploy Pipeline" data-type="content">
+  <div class="slide-label">Chapter 1 — Steps 1.6 + 1.7</div>
+  <h2>Confirm Model &amp; <span>Deploy Ingest Pipeline</span></h2>
+  <div class="c-teal-rule"></div>
+  <div class="two-col" style="flex:1">
+    <div class="col">
+      <div class="code" style="font-size:clamp(6.5px,.74vw,9px)">
+        <span class="cmt"># 1.6 — Get the trained model ID</span><br>
+        <span class="kw">GET</span> _ml/trained_models<br>
+        &nbsp;&nbsp;?tags=mortgage-privileged-access-classification<br>
+        &nbsp;&nbsp;&amp;human=true<br><br>
+        <span class="cmt"># Confirm model_type: tree_ensemble</span><br>
+        <span class="cmt"># Note the exact timestamped model_id</span><br><br>
+        <span class="cmt"># 1.7 — Create the inference pipeline</span><br>
+        <span class="kw">PUT</span> _ingest/pipeline/mortgage-privileged-access-ml<br>
+        {<br>
+        &nbsp;<span class="str">"processors"</span>: [{<br>
+        &nbsp;&nbsp;<span class="str">"inference"</span>: {<br>
+        &nbsp;&nbsp;&nbsp;<span class="str">"model_id"</span>: <span class="str">"mortgage-privileged-access-classification-{{timestamp}}"</span>,<br>
+        &nbsp;&nbsp;&nbsp;<span class="str">"target_field"</span>: <span class="str">"ml"</span>,<br>
+        &nbsp;&nbsp;&nbsp;<span class="str">"inference_config"</span>: {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"classification"</span>: {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"num_top_classes"</span>: <span class="num">3</span>,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"results_field"</span>: <span class="str">"risk_level_prediction"</span>,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"top_classes_results_field"</span>: <span class="str">"top_classes"</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;}},<br>
+        &nbsp;&nbsp;&nbsp;<span class="str">"on_failure"</span>: [{<span class="str">"set"</span>: {<span class="str">"field"</span>: <span class="str">"ml.inference_error"</span>,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"value"</span>: <span class="str">"{{_ingest.on_failure_message}}"</span>}}]<br>
+        &nbsp;&nbsp;}}]<br>
+        }
+      </div>
+    </div>
+    <div class="col">
+      <div class="hl hl-blue">
+        <p><strong>Test the pipeline</strong> before wiring it to live data. Simulate against both source types:</p>
+      </div>
+      <div class="code" style="font-size:clamp(6.5px,.72vw,9px); margin-top:0">
+        <span class="cmt"># PingOne document</span><br>
+        <span class="kw">POST</span> _ingest/pipeline/mortgage-privileged-access-ml/_simulate<br>
+        { <span class="str">"docs"</span>: [{ <span class="str">"_source"</span>: {<br>
+        &nbsp;&nbsp;<span class="str">"ping_one.audit.risk.score"</span>: <span class="num">91.5</span>,<br>
+        &nbsp;&nbsp;<span class="str">"ping_one.audit.result.status"</span>: <span class="str">"FAILED"</span>,<br>
+        &nbsp;&nbsp;<span class="str">"event.outcome"</span>: <span class="str">"failure"</span><br>
+        }}]}<br><br>
+        <span class="cmt"># Oracle document</span><br>
+        <span class="kw">POST</span> _ingest/pipeline/mortgage-privileged-access-ml/_simulate<br>
+        { <span class="str">"docs"</span>: [{ <span class="str">"_source"</span>: {<br>
+        &nbsp;&nbsp;<span class="str">"oracle.database_audit.action"</span>: <span class="str">"DROP TABLE"</span>,<br>
+        &nbsp;&nbsp;<span class="str">"oracle.database_audit.privilege"</span>: <span class="str">"SYSDBA"</span>,<br>
+        &nbsp;&nbsp;<span class="str">"event.outcome"</span>: <span class="str">"success"</span><br>
+        }}]}
+      </div>
+      <div class="hl hl-teal" style="margin-top:0">
+        <p>Both should return <ic>ml.risk_level_prediction</ic> = LOW / MEDIUM / HIGH plus <ic>ml.top_classes</ic> with probabilities for all 3 classes. If you see <ic>ml.inference_error</ic>, check the model ID.</p>
+      </div>
+    </div>
+  </div>
+  <div class="wm"><svg width="52" height="14" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/><rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/><rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/><rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/><text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="#1C1E23">elastic</text></svg></div>
+</div>
+
+<!-- ╔═══╗ SLIDE 15 — 1.8 WIRE PIPELINE ╚═══╝ -->
+<div class="slide s-content" data-title="1.8 — Wire Pipeline to Both Indices" data-type="content">
+  <div class="slide-label">Chapter 1 — Step 1.8</div>
+  <h2>Wire Pipeline to <span>Both Data Streams</span></h2>
+  <div class="c-teal-rule"></div>
+  <div class="two-col" style="flex:1">
+    <div class="col">
+      <div class="code">
+        <span class="cmt"># Apply pipeline at data stream level</span><br>
+        <span class="cmt"># Propagates to current backing index</span><br>
+        <span class="cmt"># + all future rollovers automatically</span><br><br>
+        <span class="kw">PUT</span> /logs-ping_one.audit-mortgage/_settings<br>
+        {<br>
+        &nbsp;<span class="str">"index"</span>: {<br>
+        &nbsp;&nbsp;<span class="str">"default_pipeline"</span>: <span class="str">"mortgage-privileged-access-ml"</span><br>
+        &nbsp;}<br>
+        }<br><br>
+        <span class="kw">PUT</span> /logs-oracle.database_audit-mortgage/_settings<br>
+        {<br>
+        &nbsp;<span class="str">"index"</span>: {<br>
+        &nbsp;&nbsp;<span class="str">"default_pipeline"</span>: <span class="str">"mortgage-privileged-access-ml"</span><br>
+        &nbsp;}<br>
+        }<br><br>
+        <span class="cmt"># Verify both settings applied</span><br>
+        <span class="kw">GET</span> /logs-ping_one.audit-mortgage/_settings/index.default_pipeline<br>
+        <span class="kw">GET</span> /logs-oracle.database_audit-mortgage/_settings/index.default_pipeline
+      </div>
+    </div>
+    <div class="col">
+      <div class="hl hl-teal">
+        <p><strong>Why data stream level?</strong> Applying <ic>_settings</ic> to the data stream name rather than the backing index (<ic>.ds-logs-*</ic>) means the pipeline propagates to the current index and all future rollovers without re-applying manually.</p>
+      </div>
+      <div class="hl hl-blue" style="margin-top:0">
+        <p><strong>Optional: View in UI</strong> — Search <ic>ingest pipelines</ic> → find <ic>mortgage-privileged-access-ml</ic> → click <strong>Edit pipeline</strong> → click the <strong>Inference</strong> processor to see the full model configuration in the UI.</p>
+      </div>
+      <div class="hl hl-yellow" style="margin-top:0">
+        <p><strong>Troubleshooting:</strong> If new documents show <ic>ml.inference_error</ic>, the model ID in the pipeline may not match the actual trained model. Run:<br><ic>GET _ml/trained_models?tags=mortgage-privileged-access-classification</ic> and compare.</p>
+      </div>
+    </div>
+  </div>
+  <div class="wm"><svg width="52" height="14" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/><rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/><rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/><rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/><text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="#1C1E23">elastic</text></svg></div>
+</div>
+
+<!-- ╔═══╗ SLIDE 16 — 1.9 LIVE PREDICTIONS ╚═══╝ -->
+<div class="slide s-content" data-title="1.9 — Observe Live Predictions" data-type="content">
+  <div class="slide-label">Chapter 1 — Step 1.9</div>
+  <h2>Observe <span>Live Predictions</span> in Discover</h2>
+  <div class="c-teal-rule"></div>
+  <div class="two-col" style="flex:1">
+    <div class="col">
+      <div class="steps">
+        <div class="step">
+          <div class="snum">1</div>
+          <div>
+            <div class="step-t">Start live data generation</div>
+            <div class="step-d">In <strong>host1-cli</strong> terminal run <ic>bash .../Scripts/livedata.sh</ic> to begin streaming new events against the pipeline-wired data streams.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="snum">2</div>
+          <div>
+            <div class="step-t">Open Discover → logs-ping_one.audit-mortgage</div>
+            <div class="step-d">Set time range to <strong>Last 15 minutes</strong> to see only new documents — those scored by the inference pipeline on ingest.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="snum">3</div>
+          <div>
+            <div class="step-t">Add ml.* columns to the table</div>
+            <div class="step-d">Add: <ic>ml.risk_level_prediction</ic>, <ic>ml.top_classes</ic>, <ic>ping_one.audit.risk.score</ic>, <ic>event.outcome</ic>.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="snum">4</div>
+          <div>
+            <div class="step-t">Spot the pattern</div>
+            <div class="step-d">Click a HIGH-risk prediction. Does <ic>ml.risk_level_prediction = HIGH</ic> correlate with high <ic>risk.score</ic> values and FAILED outcomes? This is the model's learned decision boundary in action.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <div class="ct-rule"></div>
+        <div class="card-title">Columns to add in Discover</div>
+        <div class="card-body" style="font-size:clamp(7px,.8vw,9.5px)">
+          <table style="width:100%;border-collapse:collapse">
+            <tr><td style="padding:3px 0"><ic>@timestamp</ic></td><td style="color:var(--ink);font-size:.9em">When the event arrived</td></tr>
+            <tr><td style="padding:3px 0"><ic>event.outcome</ic></td><td style="color:var(--ink);font-size:.9em">success / failure</td></tr>
+            <tr><td style="padding:3px 0"><ic>ping_one.audit.risk.score</ic></td><td style="color:var(--ink);font-size:.9em">Raw IAM risk score 0–100</td></tr>
+            <tr><td style="padding:3px 0"><ic>ping_one.audit.action.type</ic></td><td style="color:var(--ink);font-size:.9em">IAM action category</td></tr>
+            <tr><td style="padding:3px 0"><ic>ml.risk_level_prediction</ic></td><td style="color:var(--ink);font-size:.9em"><strong>Model prediction</strong></td></tr>
+            <tr><td style="padding:3px 0"><ic>ml.top_classes</ic></td><td style="color:var(--ink);font-size:.9em">All 3 class probabilities</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="hl hl-teal" style="margin-top:0">
+        <p><strong>What you're seeing:</strong> Every new document is scored at write time by the <ic>mortgage-privileged-access-ml</ic> pipeline. No batch jobs. No separate inference service. The model output lives alongside the raw event data in the same index.</p>
+      </div>
+    </div>
+  </div>
+  <div class="wm"><svg width="52" height="14" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/><rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/><rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/><rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/><text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="#1C1E23">elastic</text></svg></div>
+</div>
+
+<!-- ╔═══╗ SLIDE 17 — CHAPTER 2 SECTION ╚═══╝ -->
+<div class="slide s-section" data-title="Chapter 2 — Agent + Workflow Automation" data-type="section">
+  <div class="sec-tag"><span class="dot"></span>Chapter 2</div>
+  <div class="sec-num">02</div>
+  <div class="teal-rule"></div>
+  <h2>AI Agent Analysis &amp;<br>Workflow Automation</h2>
+  <div class="sec-desc">Use Elastic Agent Builder to build an ML Readiness Analyst that discovers schema and assesses class balance — then wire an Elastic Workflow that automatically creates, trains, and deploys <ic class="w">mortgage-audit-classification</ic> end-to-end.</div>
+</div>
+
+<!-- ╔═══╗ SLIDE 18 — CHAPTER 2 DETAIL ╚═══╝ -->
+<div class="slide s-content" data-title="Chapter 2: Agent + Workflow Steps" data-type="content">
+  <div class="slide-label">Chapter 2 — Agent + Workflow</div>
+  <h2>ML Readiness Analyst <span>&amp; Automation Workflow</span></h2>
+  <div class="c-teal-rule"></div>
+  <div class="two-col" style="flex:1">
+    <div class="col">
+      <div class="card">
+        <div class="ct-rule"></div>
+        <div class="card-sub">Steps 2.1 – 2.3</div>
+        <div class="card-title">Build the ML Readiness Analyst Agent</div>
+        <div class="card-body" style="font-size:clamp(7px,.82vw,9.5px)">
+          Enable Workflows in Advanced Settings. Build the agent using <strong>built-in platform tools only</strong>:<br><br>
+          <strong>①</strong> <ic>list_indices</ic> — mandatory first action<br>
+          <strong>②</strong> Schema discovery — field types and mappings<br>
+          <strong>③</strong> Class balance check — ES|QL histogram on <ic>audit.is_suspicious</ic><br>
+          <strong>④</strong> Feature analysis — correlation with label field<br>
+          <strong>⑤</strong> Readiness verdict + recommended hyperparameters<br>
+          <strong>⑥</strong> Trigger the Automation Workflow
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <div class="ct-rule"></div>
+        <div class="card-sub">Steps 2.4 – 2.7</div>
+        <div class="card-title">Build & Run the Automation Workflow</div>
+        <div class="card-body" style="font-size:clamp(7px,.82vw,9.5px)">
+          Parameterised workflow receives the agent's schema findings:<br><br>
+          <strong>①</strong> Check data readiness (document count, field existence)<br>
+          <strong>②</strong> Create DFA classification job via API<br>
+          <strong>③</strong> Start job and poll training phases to completion<br>
+          <strong>④</strong> Create inference pipeline for the trained model<br>
+          <strong>⑤</strong> Apply pipeline to <ic>logs-mortgage.audit-default</ic><br>
+          <strong>⑥</strong> Review Workflow execution log
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:2.5%">
+    <div class="hl hl-teal">
+      <p><strong>The agent's job</strong> = understand the data. <strong>The Workflow's job</strong> = act on that understanding. Together they reduce a multi-hour manual process — the same steps you performed in Chapter 1 — to a fully automated pipeline that runs without human intervention.</p>
+    </div>
+  </div>
+  <div class="wm"><svg width="52" height="14" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/><rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/><rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/><rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/><text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="#1C1E23">elastic</text></svg></div>
+</div>
+
+<!-- ╔═══╗ SLIDE 19 — CHAPTER 3 SECTION ╚═══╝ -->
+<div class="slide s-section" data-title="Chapter 3 — Final Thoughts" data-type="section">
+  <div class="sec-tag"><span class="dot"></span>Chapter 3</div>
+  <div class="sec-num">03</div>
+  <div class="teal-rule"></div>
+  <h2>Final Thoughts<br>&amp; Take-Aways</h2>
+  <div class="sec-desc">The three levels of ML automation. Key principles you can carry into any DFA project. Student challenge: apply this workflow to a new dataset.</div>
+</div>
+
+<!-- ╔═══╗ SLIDE 20 — AUTOMATION LEVELS ╚═══╝ -->
+<div class="slide s-content" data-title="The Three Automation Levels" data-type="content">
+  <div class="slide-label">Chapter 3 — Take-Aways</div>
+  <h2>The Three <span>Automation Levels</span></h2>
+  <div class="c-teal-rule"></div>
+  <div class="card-grid g3" style="flex:1">
+    <div class="card">
+      <div class="card-icon">🔧</div>
+      <div class="ct-rule"></div>
+      <div class="card-sub">Level 1</div>
+      <div class="card-title">Manual</div>
+      <div class="card-body">Dev Tools, Kibana wizard, step-by-step. Full control over every parameter. Best for learning the system — and for novel datasets where you need to inspect each decision.</div>
+      <div style="margin-top:auto;padding-top:6px"><span class="tag t-blue">Chapter 1</span></div>
+    </div>
+    <div class="card">
+      <div class="card-icon">🤝</div>
+      <div class="ct-rule"></div>
+      <div class="card-sub">Level 2</div>
+      <div class="card-title">Agent-Assisted</div>
+      <div class="card-body">AI agent discovers schema, checks class balance, assesses feature quality, and recommends hyperparameters. You review and approve before the job is created.</div>
+      <div style="margin-top:auto;padding-top:6px"><span class="tag t-pink">Chapter 2 — Agent</span></div>
+    </div>
+    <div class="card">
+      <div class="card-icon">⚡</div>
+      <div class="ct-rule"></div>
+      <div class="card-sub">Level 3</div>
+      <div class="card-title">Fully Automated</div>
+      <div class="card-body">Workflow creates the DFA job, starts training, polls for completion, creates the inference pipeline, applies it to the data stream, and reports back — all without human intervention.</div>
+      <div style="margin-top:auto;padding-top:6px"><span class="tag t-teal">Chapter 2 — Workflow</span></div>
+    </div>
+  </div>
+  <div class="wm"><svg width="52" height="14" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/><rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/><rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/><rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/><text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="#1C1E23">elastic</text></svg></div>
+</div>
+
+<!-- ╔═══╗ SLIDE 21 — KEY TAKEAWAYS ╚═══╝ -->
+<div class="slide s-content" data-title="Key Takeaways" data-type="content">
+  <div class="slide-label">Chapter 3 — Take-Aways</div>
+  <h2>Key <span>Takeaways</span></h2>
+  <div class="c-teal-rule"></div>
+  <div class="card-grid g2" style="flex:1">
+    <div class="card">
+      <div class="ct-rule"></div>
+      <div class="card-title">Excludes matter as much as includes</div>
+      <div class="card-body">The Kibana wizard only exposes includes. Explicitly excluding <ic>@timestamp</ic>, <ic>user.id</ic>, and <ic>user.name</ic> is what makes the model learn behavioral risk patterns rather than time-of-day patterns or individual user habits.</div>
+    </div>
+    <div class="card">
+      <div class="ct-rule"></div>
+      <div class="card-title">Cross-source training unifies risk language</div>
+      <div class="card-body">A single model trained on PingOne + Oracle normalizes risk across two completely different systems. The downstream pipeline produces <ic>ml.risk_level_prediction = HIGH</ic> regardless of where the event originated.</div>
+    </div>
+    <div class="card">
+      <div class="ct-rule"></div>
+      <div class="card-title">Ingest pipelines make ML operational</div>
+      <div class="card-body">Every new event is scored at write time. No batch jobs, no separate inference service, no latency. The model output lives alongside the raw data in the same index — queryable, alertable, dashboardable.</div>
+    </div>
+    <div class="card">
+      <div class="ct-rule"></div>
+      <div class="card-title">Student challenge</div>
+      <div class="card-body">Apply the full lifecycle to a network traffic dataset. Use <ic>logs-network.traffic-default</ic> as the source. What is your dependent variable? What should be excluded? Build the agent prompt to discover it automatically.</div>
+    </div>
+  </div>
+  <div class="wm"><svg width="52" height="14" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="70" height="82" rx="8" fill="#0B64DD"/><rect x="12" y="16" width="46" height="11" rx="2" fill="#48EFCF"/><rect x="12" y="35" width="36" height="11" rx="2" fill="#FF957D"/><rect x="12" y="55" width="46" height="11" rx="2" fill="#FEC514"/><text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="#1C1E23">elastic</text></svg></div>
+</div>
+
+<!-- ╔═══╗ SLIDE 22 — CLOSING ╚═══╝ -->
+<div class="slide s-closing" data-title="Thank You" data-type="closing">
+  <div class="teal-rule" style="margin:0 auto 0 auto"></div>
+  <h2>Go Build Something<br>That Predicts Risk</h2>
+  <p>Four chapters. Three data streams. Two classification models. One end-to-end automation arc — from raw audit logs to real-time inference on every new event.</p>
+  <div style="display:flex;gap:10px;justify-content:center;margin-top:1%">
+    <span class="pill">github.com/iamhowardtheduck</span>
+    <span class="pill">elastic-ml-lifecycle-automation</span>
+  </div>
+  <div style="margin-top:5%;display:flex;flex-direction:column;align-items:center;gap:6px">
+    <svg width="96" height="26" viewBox="0 0 300 82" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="70" height="82" rx="8" fill="rgba(255,255,255,.25)"/>
+      <rect x="12" y="16" width="46" height="11" rx="2" fill="white"/>
+      <rect x="12" y="35" width="36" height="11" rx="2" fill="rgba(255,255,255,.72)"/>
+      <rect x="12" y="55" width="46" height="11" rx="2" fill="rgba(255,255,255,.88)"/>
+      <text x="82" y="57" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="44" fill="white">elastic</text>
+    </svg>
+    <span class="tagline">The Search AI Company</span>
+  </div>
+</div>
+
+</div><!-- /slides-wrap -->
+
+<!-- THUMBNAIL STRIP -->
+<div class="thumbs" id="thumbs"></div>
+<div class="kb"><kbd>←</kbd> <kbd>→</kbd> navigate &nbsp;·&nbsp; <kbd>Space</kbd> next &nbsp;·&nbsp; <kbd>T</kbd> contents</div>
+
+<script>
+const slides = [...document.querySelectorAll('.slide')];
+const total  = slides.length;
+let cur = 0;
+
+// Build thumbs
+const strip = document.getElementById('thumbs');
+const bgMap = {title:'#0B64DD', section:'#0B64DD', content:'#fff', closing:'#0B64DD'};
+slides.forEach((s,i)=>{
+  const type = s.dataset.type || 'content';
+  const th = document.createElement('div');
+  th.className = `thumb${i===0?' active':''}`;
+  th.innerHTML = `<div class="thumb-inner" style="background:${bgMap[type]||'#fff'}"></div><span class="tn ${type==='content'?'tn-w':'tn-d'}">${i+1}</span>`;
+  th.onclick = ()=>goTo(i);
+  strip.appendChild(th);
+});
+
+// Build TOC
+const tocList = document.getElementById('tocList');
+const sections = {0:'Overview',3:'Setup',5:'Chapter 1 — Classification',16:'Chapter 2 — Automation',18:'Chapter 3 — Take-Aways'};
+slides.forEach((s,i)=>{
+  if(sections[i]){const l=document.createElement('div');l.className='toc-sec';l.textContent=sections[i];tocList.appendChild(l);}
+  const it=document.createElement('div');it.className='toc-item';
+  it.innerHTML=`<span class="toc-n">${String(i+1).padStart(2,'0')}</span><span class="toc-t">${s.dataset.title}</span><span class="toc-type">${s.dataset.type}</span>`;
+  it.onclick=()=>{goTo(i);toggleTOC();};
+  tocList.appendChild(it);
+});
+
+function goTo(n){
+  slides[cur].classList.remove('active');
+  document.querySelectorAll('.thumb')[cur].classList.remove('active');
+  cur=Math.max(0,Math.min(total-1,n));
+  slides[cur].classList.add('active');
+  const thumbs=document.querySelectorAll('.thumb');
+  thumbs[cur].classList.add('active');
+  thumbs[cur].scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+  document.getElementById('ctr').textContent=`${cur+1} / ${total}`;
+  document.getElementById('prevBtn').disabled=cur===0;
+  document.getElementById('nextBtn').disabled=cur===total-1;
+  document.getElementById('prog').style.width=`${((cur+1)/total)*100}%`;
+}
+function go(d){goTo(cur+d);}
+function toggleTOC(){document.getElementById('toc').classList.toggle('open');}
+function closeTOCOut(e){if(e.target===document.getElementById('toc'))toggleTOC();}
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();go(1);}
+  if(e.key==='ArrowLeft'){e.preventDefault();go(-1);}
+  if(e.key==='t'||e.key==='T')toggleTOC();
+  if(e.key==='Escape')document.getElementById('toc').classList.remove('open');
+});
+goTo(0);
+</script>
+</body>
+</html>
