@@ -26,10 +26,10 @@ curl -X POST "http://kubernetes-vm:30920/_security/user/sdg" -H "Content-Type: a
 
 
 # Install LLM Connector
-bash /opt/workshops/elastic-llm.sh -k false -m gpt-4.1 -d true
+bash /opt/workshops/elastic-llm.sh -m gpt-5.2 -k false -d true -n gpt5-connector -P curriculum-development
 
 echo
-echo "GPT-4.1 AI Connector configured as OpenAI"
+echo "GPT-5.2 AI Connector configured as gpt5-connector"
 echo
 echo 
 echo
